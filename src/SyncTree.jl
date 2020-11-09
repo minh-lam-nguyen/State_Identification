@@ -2,6 +2,8 @@ include("util.jl")
 
 
 # return min length SS (DFA, PFA and NFA)
+# fsm : FSM
+# return : String
 function parcours_largeur(fsm)
 	
 	S = fsm.s
@@ -57,6 +59,8 @@ end
 
 # return min size of S' and the seq to get S' (DFA, PFA and NFA)
 # same as parcours_largeur, but more infors about fsm without SS
+# fsm : FSM
+# return : ( Int, String )
 function min_Sprime(fsm)
 	
 	S = fsm.s
@@ -118,8 +122,10 @@ function min_Sprime(fsm)
 
 end
 
-# return min size of S' for all k and the seq to get S'
+# return min size of S' and the seq to get S' + min size for all k
 # same as min_Sprime, but additional infos about the min length for each k (sequence size)
+# fsm : FSM
+# return : ( Int, String, Array{Int} )
 function min_Sprime_allk(fsm)
 	
 	S = fsm.s
@@ -196,6 +202,8 @@ end
 
 
 # return shortest S' synchronizing word
+# fsm : FSM, set_Sprime : Set{Int}
+# return : String
 function parcours_largeur_Sprime(fsm, set_Sprime)
 	
 	S = fsm.s
@@ -257,18 +265,20 @@ end
 ######################################## TEST ########################################
 #=
 
-fsm = read_fsm("../data/fsm_hss.fsm")
-#fsm = read_fsm("../data/cerny_n3.fsm")
-#fsm = read_fsm("../data/pfa.fsm")
-#fsm = read_fsm("../data/nfa.fsm")
+	fsm = read_fsm("../data/fsm_hss.fsm")
+	#fsm = read_fsm("../data/cerny_n3.fsm")
+	#fsm = read_fsm("../data/pfa.fsm")
+	#fsm = read_fsm("../data/nfa.fsm")
 
-#apply_input(fsm, Set([0,1,2,3]), 0)
-#apply_seq(fsm, Set([0,1,2,3]), "01010")
+	#apply_input(fsm, Set([0,1,2,3]), 0)
+	#apply_seq(fsm, Set([0,1,2,3]), "01010")
 
-#parcours_largeur(fsm)
-#min_Sprime(fsm)
-#min_Sprime_allk(fsm)
-parcours_largeur_Sprime(fsm, Set([3]))
-#parcours_largeur_Sprime(fsm, Set([0,2]))
+	#parcours_largeur(fsm)
+
+	#min_Sprime(fsm)
+	#min_Sprime_allk(fsm)
+
+	#parcours_largeur_Sprime(fsm, Set([3]))
+	#parcours_largeur_Sprime(fsm, Set([0,2]))
 
 =#

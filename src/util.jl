@@ -26,6 +26,8 @@ end
 
 
 # read .fsm file and return FSM
+# filename : String
+# return : FSM
 function read_fsm(filename)
 
 	#load FSM from .fsm
@@ -85,6 +87,8 @@ end
 
 
 # write .fsm file for the FSM
+# filename : String, fsm : FSM
+# return : void
 function write_fsm_file(filename, fsm)
 
 	open(filename, "w") do file
@@ -110,6 +114,8 @@ end
 
 # generate random nfa, nb_nondet_states: nb of non determinist states
 # warning: no output (SS)
+# nb_states, n_inp, nb_nondet_states : Int
+# return : FSM
 function random_nfa(nb_states, n_inp, nb_nondet_states)
 
 	succ = Dict( s => Dict(inp => Set() for inp in 1:n_inp) for s in 1:nb_states )
@@ -151,6 +157,8 @@ end
 
 
 # generate cerny automaton with n states
+# n : Int
+# return : FSM
 function cerny(n)
 
 	succ = [[0, 0] for u in 1:n]
@@ -173,11 +181,14 @@ end
 
 
 # return set of state S', S_set x inp -> S'
+# fsm : FSM, S_set : Set{Int}, inp : Int
+# return : Set{Int}
 function apply_input(fsm, S_set, inp)
 
 	res = Set()
+
 	for i in S_set
-		# complet / determinist
+		# dfa (complet / determinist)
 		if fsm.type == '0'
 			push!(res, fsm.succ[i+1][inp+1])
 		end
@@ -191,27 +202,43 @@ function apply_input(fsm, S_set, inp)
 		end
 
 	end
+
 	return res
 
 end
 
 
 # return set of states S', S_set x seq -> S'
+# fsm : FSM, S_set : Set{Int}, seq: String
+# return : Set{Int}
 function apply_seq(fsm, S_set, seq)
 
 	res = Set(S_set)
 	for i in seq
-		#println(res)
 		res = apply_input(fsm, res, parse(Int64,i))
 	end
 	return res
 	
 end
 
+
+# test if seq is a SS for fsm
+# fsm : FSM, seq : String, return : bool
+function is_SS(fsm, seq)
+
+	current_s = Set([i for i in 0:fsm.s-1])
+	for i in seq
+		current_s = Set([fsm.succ[j+1][parse(Int64,i)+1] for j in current_s])
+	end
+	(length(current_s) == 1) ? (return true) : (return false)
+
+end
+
+
 ######################################## TEST ########################################
 #=
 
-	#fsm = read_fsm("../data/fsm_hss.fsm")
+	fsm = read_fsm("../data/fsm_hss.fsm")
 
 	#fsm = read_fsm("../data/nfa.fsm")
 	#fsm.succ[1]
@@ -219,5 +246,9 @@ end
 	#cerny(3)
 
 	#random_nfa(4,2,1)
+
+	#apply_seq(fsm, [0,1,2,3], "01010")
+
+	#is_SS(fsm, "0101")
 
 =#
