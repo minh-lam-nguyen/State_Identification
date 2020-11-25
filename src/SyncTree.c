@@ -3,13 +3,12 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include "set.h"
 
 #define NB_SUCC 2 // nb of successors
 #define TAILLE_MAX 20 // readfile
 #define SIZE 100 // filename and res
 #define SIZE_Q 1000000
-#define SIZE_V 10000
-#define HASH_SIZE 2048
 
 typedef struct {
 	int type;
@@ -21,9 +20,9 @@ typedef struct {
 
 
 // create FSM with s states, i inputs and the transitions trans
-FSM * setFSM(FSM *fsm, int s, int i, int** trans) {
+FSM * setFSM(int s, int i, int** trans) {
 
-	fsm = malloc( sizeof(FSM) + 2*sizeof(int) * s );
+	FSM* fsm = malloc( sizeof(FSM) + 2*sizeof(int) * s );
 
 	fsm->type = 0;
 	fsm->s = s;
@@ -44,10 +43,6 @@ FSM * setFSM(FSM *fsm, int s, int i, int** trans) {
 
 // free FSM
 void freeFSM(FSM *fsm) {
-	int i;
-	for (i=0; i<fsm->s; i++) {
-		free(fsm->succ[i]);
-	}
 	free(fsm);
 }
 
@@ -105,7 +100,7 @@ FSM * readFSM(const char * filename) {
 	}	
 	fclose(file);
 
-	FSM * fsm = setFSM(fsm,s,i,tr);
+	FSM * fsm = setFSM(s,i,tr);
 
 	for (j=0; j<s; j++) {
 		free(tr[j]);
@@ -138,251 +133,113 @@ void printFSM(FSM *fsm) {
 }
 
 // free queue and visited
-void clear_QV (int ** q, int taille_q, int *** v, int * taille_v) {
-	//printf("start clear\n");
-	int i,j, count=0;
-	for (i=0; i<taille_q; i++) {
-		free(q[i]);
-		count++;
-	}
-	free(q);
-	count++;
-
-	for (i=0; i<HASH_SIZE; i++) {
-		//printf("cv: %d ", taille_v[i]);
-		for (j=0; j<taille_v[i]; j++) {
-			free(v[i][j]);
-			count++;
-		}
-		free(v[i]);
-		count++;
-	}
-	free(v);
-	count++;
-	free(taille_v);
-	count++;
-	printf("end clear: %d\n", count);
+void clear_QV (int ** q, int taille_q) {
+    int i;
+    for (i=0; i<taille_q; i++) {
+            free(q[i]);
+    }
+    free(q);
 }
-
-
-long long hash_S(int * states, int taille) {
-	int i;
-	long long res = 0;
-	for(i = 0; i < taille; i++) {
-		//printf("%d ", states[i] );
-		//res += states[i] * pow(2,i);
-		res += states[i] * i;// * pow(2,i);
-		//res *= states[i] * i;
-	}
-	//printf("%I64d \n", res);
-	return res%HASH_SIZE;
-}
-
 
 // Synchronizing tree
 int syncTree(FSM *fsm, int* res) {
 
-	int j, count_m=0;
+	int j;
 
 	// queue
 	int **queue = malloc( SIZE_Q * sizeof(int*) );
-	count_m++;
 	int front_q = 0;
-	int count_q = 1;
+	int back_q = 1;
 
 	// visited set of states
-	int ***visited = malloc ( HASH_SIZE * sizeof(int**) );
-	count_m++;
-	for (j=0; j<HASH_SIZE; j++) {
-		visited[j] = malloc( SIZE_V * sizeof(int*) );
-		count_m++;
-	}
-	int count_v[HASH_SIZE] = {0};
+        Set visited = initSet();
 
-	if (!(queue && visited)) {
+	if (!(queue))
 		return -1;
-	}
 
 	// add set of all state (init) on queue and visited
 	queue[0] = malloc( (SIZE + 1 + fsm->s) * sizeof(int) );
-	count_m++;
 
 	for(j=0; j<fsm->s; j++) {
-		queue[0][j] = 1;
+            queue[0][j] = 1;
 	}
 	queue[0][j] = 0;
 
-
-	int h = hash_S(queue[0], fsm->s);
-	visited[h][0] = malloc( fsm->s * sizeof(int) );
-	count_m++;
-	for(j=0; j<fsm->s; j++) {
-		visited[h][0][j] = 1;
-	}
-	count_v[h]++;
-
-	int max_v = 1;
-
 	// bfs
-	while (count_q) {
+	while (front_q != back_q) {
 
 
 		int current = front_q;
 		front_q++; 
-		count_q--;
+
+                int* states = queue[current]; 
+
+                int added = add(visited, states, fsm->s);
+                if(added == 0)
+                    continue;
+                if(added == -1){
+                    printf("ERREUR CAPACITE ATTEINTE\n");
+                    break;
+                }
+               
+                // size of current seq
+		int seq_size = states[fsm->s];
+                    
+                int k, tmp_cpt = 0;
+                for(k=0; k<fsm->s; k++)
+                    if (states[k] == 1)
+                        tmp_cpt++;
+
+                // if singleton (1 and only one state) : SS
+                if (tmp_cpt==1) {
+                    for(k=0; k<seq_size ;k++)
+                        res[k] = states[k+fsm->s+1];
+                    clear_QV(queue, back_q);
+                    freeSet(visited);
+                    return seq_size;
+                }
 
 		//printf("current: %d / ttl_q: %d \n", current, current + count_q+1);
 
 		// c0 and c1 successors of current
-		int *c0 = malloc(fsm->s * sizeof(int));
-		int *c1 = malloc(fsm->s * sizeof(int));
+		int *c0 = malloc((SIZE + 1 + fsm->s) * sizeof(int));
+		int *c1 = malloc((SIZE + 1 + fsm->s) * sizeof(int));
 		
 		int j;
 		for (j=0; j<fsm->s; j++) {
-			c0[j] = 0;
-			c1[j] = 0;
+                    c0[j] = 0;
+                    c1[j] = 0;
 		}
 
 		for (j=0; j<fsm->s; j++) {
-			if (queue[current][j]) {
-				c0[ fsm->succ[j][0] ] = 1;
-				c1[ fsm->succ[j][1] ] = 1;
-			}
+                    if (states[j]) {
+                        c0[ fsm->succ[j][0] ] = 1;
+                        c1[ fsm->succ[j][1] ] = 1;
+                    }
 		}
+                int* succs[2] = {c0, c1};
 
-		int h0 = hash_S(c0, fsm->s);
-		int h1 = hash_S(c1, fsm->s);
+                for(int symbol = 0; symbol < 2; symbol++){
+                    int* successor = succs[symbol];
+                    int inVisited = find(visited, successor, fsm->s);
 
-		// check if c0/c1 already visited
-		int isVisited0 = 0;
-		int isVisited1 = 0;
-		
-		//printf("cv0 / cv1 : %d %d \n", count_v[h0], count_v[h1]);
-
-		j=0;
-		while(!isVisited0 && j<count_v[h0]) {
-			int k;
-			isVisited0 = 1;
-			for(k=0; k<fsm->s;k++) {
-				if (visited[h0][j][k] != c0[k]){
-					isVisited0 = 0;
-				}
-			}
-			j++;
-		}
-		j=0;
-		while(!isVisited1 && j<count_v[h1]) {
-			int k;
-			isVisited1 = 1;
-			for(k=0; k<fsm->s;k++) {
-				if (visited[h1][j][k] != c1[k]){
-					isVisited1 = 0;
-				}
-			}
-			j++;
-		}
-
-
-		// size of current seq
-		int seq_size = queue[current][fsm->s];
-
-		// c0 not in visited
-		if (!isVisited0) {
-			int k, tmp_cpt = 0;
-			for(k=0; k<fsm->s; k++) {
-				if (c0[k] == 1) {
-					tmp_cpt++;
-				}
-			}
-
-			// if singleton (1 and only one state) : SS
-			if (tmp_cpt==1) {
-				for(k=0; k<seq_size ;k++) {
-					res[k] = queue[current][k+fsm->s+1];
-				}
-				res[k] = 0;
-				printf("malloc: %d\n", count_m);
-				clear_QV(queue, count_q+current, visited, count_v);
-				printf("max_v: %d\n", max_v);
-				return seq_size+1;
-			}else{
-			// else : add to visited and queue
-				count_q++;
-				queue[current+count_q] = malloc( (SIZE + 1 + fsm->s) * sizeof(int) );
-				visited[h0][count_v[h0]] = malloc( fsm->s * sizeof(int) );
-				count_m++;
-				count_m++;
-
-				for(k=0; k<fsm->s; k++) {
-					queue[current+count_q][k] = c0[k];
-					visited[h0][count_v[h0]][k] = c0[k];
-				}
-				count_v[h0]++;
-				queue[current+count_q][k] = seq_size+1;
-
-
-				for(k=0; k<seq_size; k++) {
-					queue[current+count_q][k+fsm->s+1] = queue[current][k+fsm->s+1];
-				}
-				queue[current+count_q][k + fsm->s + 1] = 0;
-
-			}
-		}
-
-		// c1 not in visited
-		if (!isVisited1) {
-			// if singleton (1 and only one state)
-			int k, tmp_cpt = 0;
-			for(k=0; k<fsm->s; k++) {
-				if (c1[k] == 1) {
-					tmp_cpt++;
-				}
-			}
+                    if(inVisited == 1)
+                        continue;
 			
-			// if singleton (1 and only one state) : SS
-			if (tmp_cpt==1) {
-				for(k=0; k<seq_size ;k++) {
-					res[k] = queue[current][k+fsm->s+1];
-				}
-				res[k] = 1;
-				printf("malloc: %d\n", count_m);
-				clear_QV(queue, count_q+current, visited, count_v);
-				printf("max_v: %d\n", max_v);
-				return seq_size+1;
-			}else{
-			// else : add to visited and queue
-				count_q++;
-				queue[current+count_q] = malloc( (SIZE + 1 + fsm->s) * sizeof(int) );
-				visited[h1][count_v[h1]] = malloc( fsm->s * sizeof(int) );
-				count_m++;
-				count_m++;
+                    queue[back_q] = successor;
+                    queue[back_q][k] = seq_size+1;
 
-				for(k=0; k<fsm->s; k++) {
-					queue[current+count_q][k] = c1[k];
-					visited[h1][count_v[h1]][k] = c1[k];
-				}
-				count_v[h1]++;
-				queue[current+count_q][k] = seq_size+1;
+                    for(k=0; k<seq_size; k++) {
+                        queue[back_q][k+fsm->s+1] = states[k+fsm->s+1];
+                    }
+                    queue[back_q][k + fsm->s + 1] = symbol;
+                    back_q++;
 
-				for(k=0; k<seq_size; k++) {
-					queue[current+count_q][k+fsm->s+1] = queue[current][k+fsm->s+1];
-				}
-				queue[current+count_q][k + fsm->s + 1] = 1;
-			}
-		}
 
-		if (count_v[h0] > max_v)
-			max_v = count_v[h0];
-		if (count_v[h1] > max_v)
-			max_v = count_v[h1];
 
-		//printf("max_v: %d\n", max_v);
-		
-		free(c0);
-		free(c1);
+                }
 	}
 
-//	clear_QV(queue, count_q+current, visited, count_v);
 
 	return -1;
 
@@ -397,13 +254,15 @@ int main() {
 	clock_t beg = clock();
 
 	for (i=1; i<=10; i++) {
-		char tmp[SIZE] = "SS_50fsm_n30/fsm_n30_";
+	    /*	
+            char tmp[SIZE] = "SS_50fsm_n30/fsm_n30_";
 		char numb[10];
-		strcat( tmp, itoa(i+1, numb, 10) );
-		//strcat( tmp, itoa(12, numb, 10) ); // longest SS
-		//strcat( tmp, itoa(34, numb, 10) ); //no SS
+                sprintf(numb, "%d", i + 1);
+                strcat(tmp, numb);
 		strcat( tmp, ".fsm" );
-		//printf("%s\n", tmp );
+	    */
+                char* tmp = "data/fsm_n20_1.fsm";
+                //printf("%s\n", tmp );
 
 		FSM * fsm = readFSM(tmp);
 		//printFSM(fsm);
@@ -423,7 +282,7 @@ int main() {
 		//ttl += (double)(e-b);
 
 		//printf("dfa %d: length SS: %d time: %f s / %f ms\n", i, taille, difftime(end, begin), (double)(e-b));
-		printf( "dfa %d: length SS: %d \t time: %f ms\n\n", i, taille, (double)(e-b) );
+		printf( "dfa %d: length SS: %d \t time: %f ms\n\n", i, taille, (double)(e-b) * 1000 / CLOCKS_PER_SEC);
 		//printf( "dfa %d: length SS: %d\n", i, taille );
 		
 		//int j;
@@ -432,7 +291,6 @@ int main() {
 		//	printf("%d", res[j]);
 		//}
 		//printf("\n\n");
-
 		freeFSM(fsm);
 
 	}
@@ -441,7 +299,7 @@ int main() {
 	//printf("total time: %f seconds / average (50 dfa): %f seconds\n", total, total/(i-1));
 
 	clock_t end = clock();
-	double ttl = (double)(end-beg);
+	double ttl = (double)(end-beg)* 1000 / CLOCKS_PER_SEC;
 	printf("total time: %f ms / average: %f ms (%d fsm)", ttl, ttl/(i-1), i-1);
 
 	return 0;
