@@ -8,10 +8,16 @@ SyncTree_hashset: obj/SyncTree.o obj/data_structures/set.o
 SyncTree_vector: obj/SyncTree.o obj/data_structures/set_vector.o
 	$(CC) -o bin/$@ $^
 
+SyncTree_stlset: obj/SyncTree.o obj/data_structures/set_stl.o
+	$(CC) -o bin/$@ $^
+
 test_hashset: obj/test.o obj/data_structures/set.o
 	$(CC) -o bin/$@ $^
 
 test_vector: obj/test.o obj/data_structures/set_vector.o
+	$(CC) -o bin/$@ $^
+
+test_stlset: obj/test.o obj/data_structures/set_stl.o
 	$(CC) -o bin/$@ $^
 
 obj/%.o: src/%.c
