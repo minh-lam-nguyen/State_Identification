@@ -173,7 +173,6 @@ int syncTree(FSM *fsm, int* res) {
 		front_q++; 
 
                 int* states = queue[current]; 
-
                 int added = add(visited, states);
                 if(added == 0)
                     continue;
@@ -229,7 +228,7 @@ int syncTree(FSM *fsm, int* res) {
                     }
 			
                     queue[back_q] = successor;
-                    queue[back_q][k] = seq_size+1;
+                    queue[back_q][fsm->s] = seq_size+1;
 
                     for(k=0; k<seq_size; k++) {
                         queue[back_q][k+fsm->s+1] = states[k+fsm->s+1];
