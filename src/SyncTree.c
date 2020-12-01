@@ -10,6 +10,8 @@
 #define SIZE 100 // filename and res
 #define SIZE_Q 1000000
 
+#define INT_SIZE (int)(sizeof(int)*8-1)
+
 typedef struct {
 	int type;
 	int s;
@@ -35,9 +37,106 @@ FSM * setFSM(int s, int i, int** trans) {
 		fsm->succ[j][0] = trans[j][0];
 		fsm->succ[j][1] = trans[j][1];
 	}
-	
-	return fsm;
 
+	return fsm;
+}
+
+
+// print a FSM
+void printFSM(FSM *fsm) {
+
+	printf("\tPrint FSM\n");
+
+	printf("F %d\n", fsm->type);
+	printf("s %d\n", fsm->s);
+	printf("i %d\n", fsm->i);
+	printf("p %d\n", fsm->p);
+
+	int j;
+	for(j=0; j<fsm->s; j++)
+	{
+		printf("%d 0 %d 0\n", j,fsm->succ[j][0]);
+		printf("%d 1 %d 0\n", j,fsm->succ[j][1]);
+	}
+
+	printf("\tEnd Print FSM\n\n");
+
+}
+
+// free queue and visited
+void clear_QV (int ** q, int taille_q) {
+    int i;
+    for (i=0; i<taille_q; i++) {
+            free(q[i]);
+    }
+    free(q);
+}
+
+int* initNode(FSM * fsm){
+    // Each node is a list of fsm->s bits
+    // If the i-th lowest bit is 1, then the i-th state is in the node.
+    // Each of the first bits is hidden in a INT_SIZE byte integer. INT_SIZE is defined as the number of bits needed to encode an integer minus 1 (for the sign bit)
+    // For instance, a node containing the states 0, 1, 3 and 5 of a 7 nodes automata would be encoded with the byte 0b00101011.
+    // As an integer is encoded with INT_SIZE bits, that number woud be completed with INT_SIZE - 8 zeros on the left
+    // If the automata has more than INT_SIZE states, we use two or more integers. The last bit of the first integer is the state 0, the second last is 1, ... the first is the INT_SIZE - 1 -th state, ...
+    //
+    // Finally, a state also contains a sequence of 1 and 0.
+    // That list of states is then followed by a number n and n bits.
+    //
+    // This function returns a node corresponding to all the states : so it returns a list of integers 0b1111...1111 0b1111...1111 ... 0b1111...1111 0b000...001111...111 The number of ones in the last integer
+    // depends on the number of states in the automata : fsm->s % INT_SIZE.
+    // The following sequence is of size 0 and is initialized with 0.
+    //
+
+    int size = fsm->s / INT_SIZE + 1; // Number of integers needed to encode all the bits
+    int* state = (int*)malloc( (SIZE + 1 + size) * sizeof(int) );
+
+    // The initial states contains
+    for(int j = 0; j < size - 1; j++){
+        state[j] = ((unsigned int)(~0)) >> 1; // Only ones except the first
+    }
+    int last_size = fsm->s % INT_SIZE;
+    state[size - 1] = ((unsigned int)(~0)) >> (INT_SIZE - last_size + 1); // 2^(INT_SIZE - lastsize) - 1
+
+    // Init the size of the sequence following the states and the sequence itself with 0
+    for(int j=size; j<SIZE + 1 + size; j++)
+        state[j] = 0;
+    return state;
+}
+
+int* successor(FSM * fsm, int* node, int input){
+    int size = fsm->s / INT_SIZE + 1;
+    int* neigh = (int*)malloc( (SIZE + 1 + size) * sizeof(int) );
+    
+    int j;
+    for (j=0; j<SIZE + 1 + size; j++) {
+        neigh[j] = 0;
+    }
+
+    int index = 0;
+    for(j = 0; j < size - 1; j++){
+        int x = node[j];
+        while(x != 0){
+            if(x % 2 == 1){ // Last bit of x
+                int succ = fsm->succ[index][input];
+                neigh[succ / INT_SIZE] |= (1 << (succ % INT_SIZE));
+            }
+            index += 1;
+            x /= 2;
+        }
+    }
+        
+    int x = node[size - 1];
+    while(x != 0){
+        if(x % 2 == 1){ // Last bit of x
+            int succ = fsm->succ[index][input];
+            neigh[succ / INT_SIZE] |= (1 << (succ % INT_SIZE));
+        }
+        index += 1;
+        x /= 2;
+    }
+
+    return neigh;
 }
 
 
@@ -111,40 +210,9 @@ FSM * readFSM(const char * filename) {
 }
 
 
-// print a FSM
-void printFSM(FSM *fsm) {
-
-	printf("\tPrint FSM\n");
-
-	printf("F %d\n", fsm->type);
-	printf("s %d\n", fsm->s);
-	printf("i %d\n", fsm->i);
-	printf("p %d\n", fsm->p);
-
-	int j;
-	for(j=0; j<fsm->s; j++)
-	{
-		printf("%d 0 %d 0\n", j,fsm->succ[j][0]);
-		printf("%d 1 %d 0\n", j,fsm->succ[j][1]);
-	}
-
-	printf("\tEnd Print FSM\n\n");
-
-}
-
-// free queue and visited
-void clear_QV (int ** q, int taille_q) {
-    int i;
-    for (i=0; i<taille_q; i++) {
-            free(q[i]);
-    }
-    free(q);
-}
-
 // Synchronizing tree
 int syncTree(FSM *fsm, int* res) {
 
-	int j;
 
 	// queue
 	int **queue = (int**)malloc( SIZE_Q * sizeof(int*) );
@@ -158,12 +226,8 @@ int syncTree(FSM *fsm, int* res) {
 		return -1;
 
 	// add set of all state (init) on queue and visited
-	queue[0] = (int*)malloc( (SIZE + 1 + fsm->s) * sizeof(int) );
-
-	for(j=0; j<fsm->s; j++)
-            queue[0][j] = 1;
-	for(j=fsm->s; j<SIZE + 1 + fsm->s; j++)
-            queue[0][j] = 0;
+	queue[0] = initNode(fsm);
+        int encoding_size = fsm->s / INT_SIZE + 1;
 
 	// bfs
 	while (front_q != back_q) {
@@ -181,19 +245,29 @@ int syncTree(FSM *fsm, int* res) {
                     printf("ERREUR CAPACITE ATTEINTE\n");
                     break;
                 }
-               
+
                 // size of current seq
-		int seq_size = states[fsm->s];
                     
                 int k, tmp_cpt = 0;
-                for(k=0; k<fsm->s; k++)
-                    if (states[k] == 1)
-                        tmp_cpt++;
+                for(int i = 0; i < encoding_size; i++){
+                    int x = states[i];
+                    while(x != 0){
+                        if(x % 2 == 1){
+                            tmp_cpt++;
+                            if(tmp_cpt == 2)
+                                goto end;
+                        }
+                        x /= 2;
+                    }
+                }
+                end:
+		
+                int seq_size = states[encoding_size];
 
                 // if singleton (1 and only one state) : SS
                 if (tmp_cpt==1) {
                     for(k=0; k<seq_size ;k++)
-                        res[k] = states[k+fsm->s+1];
+                        res[k] = states[encoding_size+1+k];
                     clear_QV(queue, back_q);
                     freeSet(visited);
                     return seq_size;
@@ -202,21 +276,8 @@ int syncTree(FSM *fsm, int* res) {
 		//printf("current: %d / ttl_q: %d \n", current, current + count_q+1);
 
 		// c0 and c1 successors of current
-		int *c0 = (int*)malloc((SIZE + 1 + fsm->s) * sizeof(int));
-		int *c1 = (int*)malloc((SIZE + 1 + fsm->s) * sizeof(int));
-		
-		int j;
-		for (j=0; j<SIZE + 1 + fsm->s; j++) {
-                    c0[j] = 0;
-                    c1[j] = 0;
-		}
-
-		for (j=0; j<fsm->s; j++) {
-                    if (states[j]) {
-                        c0[ fsm->succ[j][0] ] = 1;
-                        c1[ fsm->succ[j][1] ] = 1;
-                    }
-		}
+		int *c0 = successor(fsm, states, 0);
+		int *c1 = successor(fsm, states, 1);
                 int* succs[2] = {c0, c1};
 
                 for(int symbol = 0; symbol < 2; symbol++){
@@ -229,12 +290,12 @@ int syncTree(FSM *fsm, int* res) {
                     }
 			
                     queue[back_q] = successor;
-                    queue[back_q][k] = seq_size+1;
+                    queue[back_q][encoding_size] = seq_size+1;
 
                     for(k=0; k<seq_size; k++) {
-                        queue[back_q][k+fsm->s+1] = states[k+fsm->s+1];
+                        queue[back_q][encoding_size + 1 + k] = states[encoding_size + 1 + k];
                     }
-                    queue[back_q][k + fsm->s + 1] = symbol;
+                    queue[back_q][encoding_size + 1 + k] = symbol;
                     back_q++;
 
 
@@ -267,7 +328,7 @@ int main() {
                 //printf("%s\n", tmp );
 
 		FSM * fsm = readFSM(tmp);
-		//printFSM(fsm);
+                //printFSM(fsm);
 
 		//time_t begin = time(NULL);
 		clock_t b = clock();
