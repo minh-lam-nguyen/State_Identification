@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include "set.h"
+#include "data_structures/set.h"
 
 #define NB_SUCC 2 // nb of successors
 #define TAILLE_MAX 20 // readfile
@@ -152,7 +152,7 @@ int syncTree(FSM *fsm, int* res) {
 	int back_q = 1;
 
 	// visited set of states
-        Set visited = initSet();
+        Set visited = initSet(fsm->s);
 
 	if (!(queue))
 		return -1;
@@ -174,7 +174,7 @@ int syncTree(FSM *fsm, int* res) {
 
                 int* states = queue[current]; 
 
-                int added = add(visited, states, fsm->s);
+                int added = add(visited, states);
                 if(added == 0)
                     continue;
                 if(added == -1){
@@ -221,7 +221,7 @@ int syncTree(FSM *fsm, int* res) {
 
                 for(int symbol = 0; symbol < 2; symbol++){
                     int* successor = succs[symbol];
-                    int inVisited = find(visited, successor, fsm->s);
+                    int inVisited = find(visited, successor);
 
                     if(inVisited == 1)
                         continue;

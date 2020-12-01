@@ -2,8 +2,11 @@ CC=gcc -Wall -Wextra
 
 all: SyncTree
 
-SyncTree: src/SyncTree.o src/set.o
-	$(CC) -o $@ $^
+SyncTree: obj/SyncTree.o obj/data_structures/set.o
+	$(CC) -o bin/$@ $^
 
-test: src/test.o src/set.o
-	$(CC) -o $@ $^
+test: obj/test.o obj/data_structures/set.o
+	$(CC) -o bin/$@ $^
+
+obj/%.o: src/%.c
+	$(CC) -o $@ -c $^
