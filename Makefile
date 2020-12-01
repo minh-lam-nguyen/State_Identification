@@ -1,12 +1,23 @@
-CC=gcc -Wall -Wextra
+CC=g++ -g -Wall -Wextra
 
-all: SyncTree
+all: SyncTree_hashset
 
-SyncTree: obj/SyncTree.o obj/data_structures/set.o
+SyncTree_hashset: obj/SyncTree.o obj/data_structures/set.o
 	$(CC) -o bin/$@ $^
 
-test: obj/test.o obj/data_structures/set.o
+SyncTree_vector: obj/SyncTree.o obj/data_structures/set_vector.o
+	$(CC) -o bin/$@ $^
+
+test_hashset: obj/test.o obj/data_structures/set.o
+	$(CC) -o bin/$@ $^
+
+test_vector: obj/test.o obj/data_structures/set_vector.o
 	$(CC) -o bin/$@ $^
 
 obj/%.o: src/%.c
 	$(CC) -o $@ -c $^
+
+clean:
+	rm bin/*
+	rm obj/data_structures/*.o
+	rm obj/*.o

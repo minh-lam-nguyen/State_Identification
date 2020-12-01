@@ -22,7 +22,7 @@ typedef struct {
 // create FSM with s states, i inputs and the transitions trans
 FSM * setFSM(int s, int i, int** trans) {
 
-	FSM* fsm = malloc( sizeof(FSM) + 2*sizeof(int) * s );
+	FSM* fsm = (FSM*)malloc( sizeof(FSM) + 2*sizeof(int) * s );
 
 	fsm->type = 0;
 	fsm->s = s;
@@ -71,11 +71,11 @@ FSM * readFSM(const char * filename) {
 
 	while (fgets(chaine, TAILLE_MAX, file)[0] != 'p') {}
 	
-	int ** tr = malloc( s * sizeof(int[2]) );
+	int ** tr = (int**)malloc( s * sizeof(int[2]) );
 
 	int j;
 	for(j=0; j<s; j++) {
-		tr[j] = malloc(2 * sizeof(int));
+		tr[j] = (int*)malloc(2 * sizeof(int));
 	}
 
 	for (j=0; j<s; j++) {
@@ -147,7 +147,7 @@ int syncTree(FSM *fsm, int* res) {
 	int j;
 
 	// queue
-	int **queue = malloc( SIZE_Q * sizeof(int*) );
+	int **queue = (int**)malloc( SIZE_Q * sizeof(int*) );
 	int front_q = 0;
 	int back_q = 1;
 
@@ -158,12 +158,12 @@ int syncTree(FSM *fsm, int* res) {
 		return -1;
 
 	// add set of all state (init) on queue and visited
-	queue[0] = malloc( (SIZE + 1 + fsm->s) * sizeof(int) );
+	queue[0] = (int*)malloc( (SIZE + 1 + fsm->s) * sizeof(int) );
 
-	for(j=0; j<fsm->s; j++) {
+	for(j=0; j<fsm->s; j++)
             queue[0][j] = 1;
-	}
-	queue[0][j] = 0;
+	for(j=fsm->s; j<SIZE + 1 + fsm->s; j++)
+            queue[0][j] = 0;
 
 	// bfs
 	while (front_q != back_q) {
@@ -202,11 +202,11 @@ int syncTree(FSM *fsm, int* res) {
 		//printf("current: %d / ttl_q: %d \n", current, current + count_q+1);
 
 		// c0 and c1 successors of current
-		int *c0 = malloc((SIZE + 1 + fsm->s) * sizeof(int));
-		int *c1 = malloc((SIZE + 1 + fsm->s) * sizeof(int));
+		int *c0 = (int*)malloc((SIZE + 1 + fsm->s) * sizeof(int));
+		int *c1 = (int*)malloc((SIZE + 1 + fsm->s) * sizeof(int));
 		
 		int j;
-		for (j=0; j<fsm->s; j++) {
+		for (j=0; j<SIZE + 1 + fsm->s; j++) {
                     c0[j] = 0;
                     c1[j] = 0;
 		}
@@ -223,8 +223,10 @@ int syncTree(FSM *fsm, int* res) {
                     int* successor = succs[symbol];
                     int inVisited = find(visited, successor);
 
-                    if(inVisited == 1)
+                    if(inVisited == 1){
+                        free(successor);
                         continue;
+                    }
 			
                     queue[back_q] = successor;
                     queue[back_q][k] = seq_size+1;
@@ -261,7 +263,7 @@ int main() {
                 strcat(tmp, numb);
 		strcat( tmp, ".fsm" );
 	    */
-                char* tmp = "data/fsm_n20_1.fsm";
+                const char* tmp = "data/fsm_n20_1.fsm";
                 //printf("%s\n", tmp );
 
 		FSM * fsm = readFSM(tmp);
