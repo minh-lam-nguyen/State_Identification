@@ -114,7 +114,7 @@ int* successor(FSM * fsm, int* node, int input){
     }
 
     int index = 0;
-    for(j = 0; j < size - 1; j++){
+    for(j = 0; j < size; j++){
         int x = node[j];
         while(x != 0){
             if(x % 2 == 1){ // Last bit of x
@@ -124,16 +124,6 @@ int* successor(FSM * fsm, int* node, int input){
             index += 1;
             x /= 2;
         }
-    }
-        
-    int x = node[size - 1];
-    while(x != 0){
-        if(x % 2 == 1){ // Last bit of x
-            int succ = fsm->succ[index][input];
-            neigh[succ / INT_SIZE] |= (1 << (succ % INT_SIZE));
-        }
-        index += 1;
-        x /= 2;
     }
 
     return neigh;
@@ -218,16 +208,16 @@ int syncTree(FSM *fsm, int* res) {
 	int **queue = (int**)malloc( SIZE_Q * sizeof(int*) );
 	int front_q = 0;
 	int back_q = 1;
+        int encoding_size = fsm->s / INT_SIZE + 1;
 
 	// visited set of states
-        Set visited = initSet(fsm->s);
+        Set visited = initSet(encoding_size);
 
 	if (!(queue))
 		return -1;
 
 	// add set of all state (init) on queue and visited
 	queue[0] = initNode(fsm);
-        int encoding_size = fsm->s / INT_SIZE + 1;
 
 	// bfs
 	while (front_q != back_q) {
@@ -317,15 +307,14 @@ int main() {
 	clock_t beg = clock();
 
 	for (i=1; i<=10; i++) {
-	    /*	
-            char tmp[SIZE] = "SS_50fsm_n30/fsm_n30_";
+	    	
+            char tmp[SIZE] = "data/SS_50fsm_n50/fsm_n50_";
 		char numb[10];
-                sprintf(numb, "%d", i + 1);
+                sprintf(numb, "%d", i);
                 strcat(tmp, numb);
 		strcat( tmp, ".fsm" );
-	    */
-                const char* tmp = "data/fsm_n20_1.fsm";
-                //printf("%s\n", tmp );
+	    
+                printf("%s\n", tmp );
 
 		FSM * fsm = readFSM(tmp);
                 //printFSM(fsm);
