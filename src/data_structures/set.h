@@ -7,9 +7,9 @@
 typedef struct s_set* Set;
 
 /**
- * Initialisation du Set
+ * Initialisation du Set, tous les éléments sont des int* de taille au moins size, seuls les size premiers entiers de chaque éléments sont utilisés pour vérifier l'unicité.
  */
-Set initSet();
+Set initSet(int size);
 
 /**
  * Libération d'un Set
@@ -18,15 +18,15 @@ void freeSet(Set s);
 
 /**
  * Essaie d'ajouter e à s. Si e est déjà dans s, ne fait rien et renvoie 0. Sinon ajoute e et renvoie 1.
- * e doit être un pointeur sur au moins size entiers créé avec malloc
+ * e doit être un pointeur sur au moins size entiers, où size est la valeur donnée avec la fonction initSet
  * Attention, modifier e après coup peut engendrer des erreurs lors de la recherche ou de l'ajout futur d'éléments.
  */
-int add(Set s, int* e, int size);
+int add(Set s, int* e);
 
 /**
  * Vérifie si e est dans s. Renvoie 1 si oui et 0 sinon.
- * e doit être un pointeur sur au moins size entiers
+ * e doit être un pointeur sur au moins size entiers où size est la valeur donnée à l'initisalisation du set
  */
-int find(Set s, int* e, int size);
+int find(Set s, int* e);
 
 #endif

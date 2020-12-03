@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include "set.h"
+#include "data_structures/set.h"
 
 #define NB_SUCC 2 // nb of successors
 #define TAILLE_MAX 50 // readfile and filename
@@ -155,7 +155,7 @@ int mergSeq(FSM *fsm, int s1, int s2){
 	//printf("q: %d %d %d\n", queue[0][0], queue[0][1], queue[0][2]);
 
 	// elem of visited: ( state1, state2 )
-	Set visited = initSet();
+	Set visited = initSet(2);
 
 	while (front_q != back_q) {
 
@@ -180,7 +180,8 @@ int mergSeq(FSM *fsm, int s1, int s2){
 			tmp[1] = temp;
 		}
 
-		int added = add(visited, tmp, 2);
+		int vis[] = {tmp[0], tmp[1]};
+		int added = add(visited, vis);
 		//printf("added: %d\n", added);
 
 		// already in visited
@@ -234,7 +235,7 @@ int syncTree(FSM *fsm, int* res) {
 	int back_q = 1;
 
 	// visited set of states
-    Set visited = initSet();
+    Set visited = initSet(fsm->s);
 
 	if (!(queue))
 		return -1;
@@ -256,7 +257,7 @@ int syncTree(FSM *fsm, int* res) {
 
                 int* states = queue[current]; 
 
-                int added = add(visited, states, fsm->s);
+                int added = add(visited, states);
                 if(added == 0)
                     continue;
                 if(added == -1){
@@ -303,7 +304,7 @@ int syncTree(FSM *fsm, int* res) {
 
                 for(int symbol = 0; symbol < 2; symbol++){
                     int* successor = succs[symbol];
-                    int inVisited = find(visited, successor, fsm->s);
+                    int inVisited = find(visited, successor);
 
                     if(inVisited == 1)
                         continue;
