@@ -2,6 +2,8 @@ println("Import libs")
 using DataStructures
 using JuMP
 using SCIP
+using Dates
+include("util.jl")
 println("Finish")
 
 
@@ -18,6 +20,25 @@ mutable struct Automata
 end
 
 Automata() = Automata(0, 0, DefaultDict(() -> []), DefaultDict(() -> []), Dict(), Dict(),Model(() -> SCIP.Optimizer(display_verblevel=0)), nothing, nothing) # Default constructor
+
+"""Build an automata from fsm (struct from util) """
+function generateAutomataFSM(fsm)
+  α = Automata()
+  α.n = fsm.s
+  α.ni = fsm.i
+  for s in 1:fsm.s
+    for i in 1:fsm.i
+      push!(α.τ[(s, i)], fsm.succ[s][i]+1)
+      push!(α.τm1[(fsm.succ[s][i]+1, i)], s)
+    end
+  end
+
+  buildMergingSequences(α)
+  buildbackwardMergingSequences(α)
+  buildPL(α) 
+
+  return α
+end
 
 """Build a deterministic automata with n states and an alphabet of size ni"""
 function generateDeterministic(n, ni)
@@ -462,7 +483,7 @@ end
 function tests()
 
   NB_TESTS = 30 
-  ns = [100]  # Size of the tested automatas
+  ns = [20]  # Size of the tested automatas
   nis = [2]#, 3, 4]  # Size of the tested alphabets. For each value in nis and each n in ns a bunch of NB_TESTS automatas are build
 
   # To store which algorithm explore less number of nodes that which algorithm 
@@ -489,9 +510,9 @@ function tests()
   nb_ignored_α = 0
   for n in ns
     for ni in nis
-      for number in 1:30
+      for number in 1:50
         index += 1
-        println(index, "/150");
+        println(index, "/50");
         α = generateDeterministic(n, ni)
         if(!hasMergingSequence(α))
           nb_ignored_α += 1
@@ -579,10 +600,11 @@ function tests()
       println("Errors : ", errors)
       println()
     end
+      display(exploreWin)
   end
 end
 
-tests()
+#tests()
 
 
 #=
@@ -625,3 +647,73 @@ println(nbExplore2, " ", nbCut2, " ", v2)
 println(nbExplore3, " ", nbCut3, " ", v3)
 println(nbExplore4, " ", nbCut4, " ", v4)
 =#
+
+
+function test2()
+
+  fsm = read_fsm("../data/cerny_fsm/cerny_n20.fsm")
+  #println(fsm)
+  
+  a = generateAutomataFSM(fsm)
+  #printAutomata(a)
+
+  debms = Dates.now()
+  nbExplore, nbCut, res = bestSearch(a, ssInitNode, ssNeighbors, ssLeaf, ssBound, ssStop)
+  finms = Dates.now()
+  println("explore: ", nbExplore,  "time: ", Dates.value(finms-debms), "ms")
+
+
+#=
+  dir_fsm = "../data/SS_50fsm_n100/"
+  list_fsm = readdir(dir_fsm)
+
+  count_fsm = 0
+  ttl_PL = 0
+  ttl_rayon = 0
+  ttl_ms = 0
+
+  for i in list_fsm
+    if occursin( ".fsm", i )
+      #println(dir_fsm*i)
+      fsm = read_fsm(dir_fsm*i)
+      a = generateAutomataFSM(fsm)
+      count_fsm += 1
+
+      if(!hasMergingSequence(a))
+        continue
+      end
+      
+      #=
+      debPL = Dates.now()
+      nbExplore, nbCut, res = bestSearch(a, ssInitNode, ssNeighbors, ssLeaf, ssBoundPL, ssStop)
+      finPL = Dates.now()
+      println("fsm: ", i, " time: ", Dates.value(finPL-debPL), "ms")
+
+      debrayon = Dates.now()
+      nbExplore, nbCut, res = bestSearch(a, ssInitNode, ssNeighbors, ssLeaf, ssBoundRadius, ssStop)
+      finrayon = Dates.now()
+      println("fsm: ", i, " time: ", Dates.value(finrayon-debrayon), "ms")
+      =#
+
+      debms = Dates.now()
+      nbExplore, nbCut, res = bestSearch(a, ssInitNode, ssNeighbors, ssLeaf, ssBound, ssStop)
+      finms = Dates.now()
+      println("fsm: ", i, " time: ", Dates.value(finms-debms), "ms")
+
+      if (count_fsm != 1)
+        #ttl_PL += Dates.value(finPL-debPL)
+        #ttl_rayon += Dates.value(finrayon-debrayon)
+        ttl_ms += Dates.value(finms-debms)
+      end
+    end
+  end
+  println("total time ms: ", ttl_ms, "ms  average: ", ttl_ms/count_fsm, "ms")
+=#
+
+  #println("total time PL: ", ttl_PL, "ms  average: ", ttl_PL/count_fsm, "ms")
+  #println("total time rayon: ", ttl_rayon, "ms  average: ", ttl_rayon/count_fsm, "ms")
+
+end
+
+test2()
+
