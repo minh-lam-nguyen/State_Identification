@@ -1,3 +1,2 @@
-*.o
-SyncTree
-test
+obj
+bin
