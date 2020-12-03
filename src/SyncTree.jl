@@ -1,4 +1,5 @@
 include("util.jl")
+using Dates
 
 
 # return min length SS (DFA, PFA and NFA)
@@ -14,7 +15,13 @@ function parcours_largeur(fsm)
 	#key: set of states s already visited / value: shortest seq to get to s
 	visited = Dict(Set([i for i in 0:S-1]) => "")
 
+
+
 	while length(to_visit) != 0
+		#println(length(visited))
+
+		# println(length(visited))
+
 
 		# current node / subset
 		current = popfirst!(to_visit)
@@ -265,15 +272,22 @@ end
 ######################################## TEST ########################################
 #=
 
-	fsm = read_fsm("../data/fsm_hss.fsm")
-	#fsm = read_fsm("../data/cerny_n3.fsm")
+	#fsm = read_fsm("../data/fsm_hss.fsm")
+	#fsm = read_fsm("../data/SS_50fsm_n100/fsm5.fsm")	
+	fsm = read_fsm("../data/cerny_fsm/cerny_n20.fsm")
 	#fsm = read_fsm("../data/pfa.fsm")
 	#fsm = read_fsm("../data/nfa.fsm")
 
 	#apply_input(fsm, Set([0,1,2,3]), 0)
 	#apply_seq(fsm, Set([0,1,2,3]), "01010")
 
-	#parcours_largeur(fsm)
+debut = Dates.now()
+
+	parcours_largeur(fsm)
+
+fin = Dates.now()
+
+println("time: ", Dates.value(fin-debut), " ms" )
 
 	#min_Sprime(fsm)
 	#min_Sprime_allk(fsm)
