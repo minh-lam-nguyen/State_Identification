@@ -385,7 +385,7 @@ function bestSearch(α, initNode, neighbors, leaf, bound, stop)
         bounds[neighbor] = bounds[states] - 1
       end
       iteration += 1
-      push!(toExplore, (h + bounds[neighbor], iteration, neighbor, vcat(seq, [i])))
+      push!(toExplore, (h + 1+ bounds[neighbor], iteration, neighbor, vcat(seq, [i])))
     end
 
   end
@@ -393,17 +393,17 @@ function bestSearch(α, initNode, neighbors, leaf, bound, stop)
 end
 
 
-""" Similar to best Search but do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not."""
-function bestSearchFibo(α, initNode, neighbors, bound)
+""" Similar to best Search but do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not. If the key is decreased, insteaf of dupplicating in the heap, we decrease the key : each node is explore only once."""
+function bestSearchUniqueExplore(α, initNode, neighbors, bound)
   nbExplore = 0 # Nb explored nodes
   identifier = 0 # Used as a unique identifier of the keys in a heap
   
-  toExplore = BinaryMinHeap{Any}() # Binary heap, to store the nodes of the tree sorted by the sum height + lower bound of the distance to the closest leaf. Each node of the tree is associated with that sum, a unique identifier (used so that two nodes with the same sum are not considered equal), the set of states and the sequence used to go to that node.
+  toExplore = MutableBinaryMinHeap{Tuple{Int64,Int64,Set{Int64},Array{Any,1}}}() # Binary heap, to store the nodes of the tree sorted by the sum height + lower bound of the distance to the closest leaf. Each node of the tree is associated with that sum, a unique identifier (used so that two nodes with the same sum are not considered equal), the set of states and the sequence used to go to that node.
   storage = Dict() # Store information on nodes of the tree : height, lower bound of the distance to the closest leaf, a unique identifier (just in case), and the key in the heap
 
   s = initNode(α) # Root of the tree
   b = bound(α, s, []) # Bound of the tree
-  key = !push(toExplore, (b, identifier, s, [])) # Insert the root in the heap
+  key = push!(toExplore, (b, identifier, s, [])) # Insert the root in the heap
   storage[s] = (0, b, identifier, key) # Store the root in storage
 
   size = 1 # Always contains the number of nodes in the heap
@@ -458,7 +458,7 @@ function bestSearchFibo(α, initNode, neighbors, bound)
 end
 
 
-""" Similar to best Search but use a fibonacci heap instead of a binaryheap. Also do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not."""
+""" Similar to best Search but use a fibonacci heap instead of a binaryheap. Also do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not. If the key is decreased, insteaf of dupplicating in the heap, we decrease the key : each node is explore only once."""
 function bestSearchFibo(α, initNode, neighbors, bound)
   nbExplore = 0 # Nb explored nodes
   identifier = 0 # Used as a unique identifier of the keys in a heap
@@ -523,7 +523,7 @@ function bestSearchFibo(α, initNode, neighbors, bound)
 end
 
 
-""" Similar to best Search but use a priority queue instead of a binaryheap. Also do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not."""
+""" Similar to best Search but use a priority queue instead of a binaryheap. Also do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not. If the key is decreased, insteaf of dupplicating in the heap, we decrease the key : each node is explore only once."""
 function bestSearchPriorityQueue(α, initNode, neighbors, bound)
   nbExplore = 0 # Nb explored nodes
   identifier = 0 # Used as a unique identifier of the keys in a heap
@@ -745,7 +745,7 @@ function tests()
         println(time6, ' ',nbExplore6, ' ', v6)
         time7 = @elapsed((nbExplore7, nbCut7, v7) = bestSearchPriorityQueue(α, ssInitNode, ssNeighbors, ssBound))
         println(time7, ' ',nbExplore7, ' ', v7)
-        time8 = @elapsed((nbExplore8, nbCut8, v8) = bestSearchPriorityQueue(α, ssInitNode, ssNeighbors, ssBound))
+        time8 = @elapsed((nbExplore8, nbCut8, v8) = bestSearchUniqueExplore(α, ssInitNode, ssNeighbors, ssBound))
         println(time8, ' ',nbExplore8, ' ', v8)
         
         # Check if there is an error
