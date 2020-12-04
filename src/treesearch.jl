@@ -447,7 +447,7 @@ function bestSearchUniqueExplore(α, initNode, neighbors, bound)
             if(h + 1 < hn)
                 # If the height is better than before, we decrease the key in the heap
                 update!(toExplore, keyn, (h + 1 + bn, idn, neighbor, vcat(seq, [i])))
-                storage[neighbor] = (h + 1, bn, idn, key)
+                storage[neighbor] = (h + 1, bn, idn, keyn)
             end
         end
 
@@ -512,7 +512,7 @@ function bestSearchFibo(α, initNode, neighbors, bound)
             if(h + 1 < hn)
                 # If the height is better than before, we decrease the key in the heap
                 DecreaseKey(toExplore, keyn, (h + 1 + bn, idn, neighbor, vcat(seq, [i])))
-                storage[neighbor] = (h + 1, bn, idn, key)
+                storage[neighbor] = (h + 1, bn, idn, keyn)
             end
         end
 
