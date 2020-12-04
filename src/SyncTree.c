@@ -6,8 +6,8 @@
 #include "data_structures/set.h"
 
 #define NB_SUCC 2 // nb of successors
-#define TAILLE_MAX 20 // readfile
-#define SIZE 100 // filename and res
+#define TAILLE_MAX 50 // readfile and filename
+#define SIZE 150 // res
 #define SIZE_Q 1000000
 
 #define INT_SIZE (int)(sizeof(int)*8-1)
@@ -199,6 +199,91 @@ FSM * readFSM(const char * filename) {
 	return fsm;
 }
 
+// compute min merging seq for (s1,s2), with s1 <= s2
+// return length of merging seq for (s1, s2), -1 if no merging (or error)
+int mergSeq(FSM *fsm, int s1, int s2){
+
+	// elem of queue: ( state1, state2, length ) 
+	int **queue = (int**)malloc( SIZE_Q * sizeof(int*) );
+	if (!queue)
+		return -1;
+	int front_q = 0;
+	int back_q = 1;
+	queue[0] = (int*)malloc( 3 * sizeof(int) );
+	queue[0][0] = s1;
+	queue[0][1] = s2;
+	queue[0][2] = 0;
+	//printf("q: %d %d %d\n", queue[0][0], queue[0][1], queue[0][2]);
+
+	// elem of visited: ( state1, state2 )
+	Set visited = initSet(2);
+
+	while (front_q != back_q) {
+
+		int current = front_q;
+		front_q++;
+		//printf("current/f/b: %d %d %d\n", current, front_q, back_q);
+
+		int *tmp = queue[current];
+		//printf("tmp: %d %d %d\n", tmp[0], tmp[1], tmp[2]);
+
+		// s1 and s2 merged 
+		if (tmp[0] == tmp[1]){
+			clear_QV(queue, back_q);
+            freeSet(visited);
+			return tmp[2];
+		}
+
+		// if (j,i) and i<j, always add (i,j) to visited
+		if (tmp[0] > tmp[1]){
+			int temp = tmp[0];
+			tmp[0] = tmp[1];
+			tmp[1] = temp;
+		}
+
+		int vis[] = {tmp[0], tmp[1]};
+		int added = add(visited, vis);
+		//printf("added: %d\n", added);
+
+		// already in visited
+        if(added == 0) 
+            continue;
+        // visited too big
+        if(added == -1){ 
+            printf("ERREUR CAPACITE ATTEINTE\n");
+            break;
+        }
+
+        // add successors to queue
+        for (int i=0; i<fsm->i; i++){
+	        queue[back_q] = (int*)malloc( 3 * sizeof(int) );
+        	queue[back_q][0] = fsm->succ[tmp[0]][i];
+        	queue[back_q][1] = fsm->succ[tmp[1]][i];
+        	queue[back_q][2] = tmp[2]+1;
+        	back_q++;
+        }
+
+	}
+
+	clear_QV(queue, back_q);
+    freeSet(visited);
+	return -1;
+}
+
+// compute max min merging seq 
+int maxMS(FSM *fsm){
+
+	int res = -1;
+	for (int i=0; i<fsm->s; i++) {
+		for (int j=i+1; j<fsm->s; j++) {
+			int tmp = mergSeq( fsm, i, j ) ;
+			if (tmp > res)
+				res = tmp;
+		}
+	}
+
+	return res;
+}
 
 // Synchronizing tree
 int syncTree(FSM *fsm, int* res) {
@@ -227,7 +312,6 @@ int syncTree(FSM *fsm, int* res) {
 		front_q++; 
 
                 int* states = queue[current]; 
-
                 int added = add(visited, states);
                 if(added == 0)
                     continue;
@@ -277,6 +361,7 @@ int syncTree(FSM *fsm, int* res) {
                     if(inVisited == 1){
                         free(successor);
                         continue;
+
                     }
 			
                     queue[back_q] = successor;
@@ -293,14 +378,12 @@ int syncTree(FSM *fsm, int* res) {
                 }
 	}
 
-
 	return -1;
-
 }
 
 
 
-int main() {
+int test_ST() {
 
 	int i;
 	//float total = 0, ttl = 0;
@@ -308,13 +391,11 @@ int main() {
 
 	for (i=1; i<=10; i++) {
 	    	
-            char tmp[SIZE] = "data/SS_50fsm_n50/fsm_n50_";
+                char tmp[SIZE] = "data/SS_50fsm_n50/fsm_n50_";
 		char numb[10];
                 sprintf(numb, "%d", i);
                 strcat(tmp, numb);
 		strcat( tmp, ".fsm" );
-	    
-                printf("%s\n", tmp );
 
 		FSM * fsm = readFSM(tmp);
                 //printFSM(fsm);
@@ -343,6 +424,7 @@ int main() {
 		//	printf("%d", res[j]);
 		//}
 		//printf("\n\n");
+		
 		freeFSM(fsm);
 
 	}
@@ -356,4 +438,28 @@ int main() {
 
 	return 0;
 
+}
+
+int test_ms() {
+
+	char* tmp = "data/fsm_hss.fsm";
+    printf( "%s\n", tmp );
+
+	FSM * fsm = readFSM(tmp);
+	printFSM(fsm);
+
+	printf( "MS(0,1): %d\n", mergSeq(fsm, 0, 1) );	
+	printf( "MS(0,2): %d\n", mergSeq(fsm, 0, 2) );	
+	printf( "MS(0,3): %d\n", mergSeq(fsm, 0, 3) );	
+	printf( "maxMS: %d\n", maxMS(fsm) );
+
+	return 0;
+}
+
+
+int main() {
+
+	test_ms();
+
+	return 0;
 }

@@ -5,20 +5,16 @@
 #include <algorithm>
 
 
-struct elem{
-    elem(int* p, int s) : e(p), size(s) {}
-    int* e;
-    int size;
-};
+int GLOBAL_SIZE = 0;
 
 struct Compare
 {
-    bool operator ()(struct elem e, struct elem f)
+    bool operator ()(int * e, int * f)
     {
-        for(int i = 0; i < e.size; i++){
-            if(e.e[i] < f.e[i])
+        for(int i = 0; i < GLOBAL_SIZE; i++){
+            if(e[i] < f[i])
                 return true;
-            if(e.e[i] > f.e[i])
+            if(e[i] > f[i])
                 return false;
         }
         return false;
@@ -26,13 +22,12 @@ struct Compare
 };
 
 struct s_set{
-    std::set<struct elem, Compare> v;
-    int size;
+    std::set<int *, Compare> v;
 };
 
 Set initSet(int size){
     Set s = new s_set();
-    s->size = size;
+    GLOBAL_SIZE = size;
     return s;
 }
 
@@ -45,14 +40,11 @@ int add(Set s, int* e){
        return 0;
    }
 
-   struct elem * f = new elem(e, s->size);
-   s->v.insert(*f);
+   s->v.insert(e);
    return 1;
 }
 
 int find(Set s, int* e){
-    struct elem * f = new elem(e, s->size);
-    int found =  s->v.find(*f) != s->v.end();
-    delete(f);
+    int found =  s->v.find(e) != s->v.end();
     return found;
 }
