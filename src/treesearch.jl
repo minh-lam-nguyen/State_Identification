@@ -1,11 +1,16 @@
-println("Import libs")
+if !(@isdefined doimports)
+    doimports = false
+    println("Import libs")
+    include("util.jl")
+    include("data_structures/fiboheap.jl")
+    println("Finish")
+end
+
 using DataStructures
 using JuMP
 using SCIP
 using Dates
-include("util.jl")
-println("Finish")
-
+using .FibonacciHeaps
 
 mutable struct Automata
   n::Int # Nb states
@@ -329,62 +334,68 @@ function bfSearch(α, initNode, neighbors, leaf, bound, stop)
 end
 
 
-"""Search tree to search for an SS of α, improved with a bound. At each iteration, the explored node is the node with the best lower bound. initNode, neighbors, leaf, bound and stop are functions that can be used to respectively build the root, find the successors of a node in the tree, check if a node is a leaf, compute the lower bound of a node and check if the search can be stopped."""
-function bestSearch(α, initNode, neighbors, leaf, bound, stop)
-  nbExplore = 0
-  nbCut = 0
-  bounds = Dict()
-  s = initNode(α)
-  bounds[s] = bound(α, s, [])
-  toExplore = BinaryMinHeap{Any}() # To store the nnodes of the tree sorted by their lower bound.
-  iteration = 0
-  push!(toExplore, (bounds[s], iteration, s, []))
-  best = Inf32
+"""Search tree to search for an SS of α, improved with a bound. At each iteration, the explored node is the node with the best lower bound. initNode, neighbors, leaf, bound and stop are functions that can be used to respectively build the root, find the successors of a node in the tree, compute the lower bound of a node."""
+function bestSearchFibo(α, initNode, neighbors, bound)
+  nbExplore = 0 # Nb explored nodes
+  identifier = 0 # Used as a unique identifier of the keys in a heap
+  
+  toExplore = MakeHeap() # Fibonacci heap, to store the nodes of the tree sorted by the sum height + lower bound of the distance to the closest leaf. Each node of the tree is associated with that sum, a unique identifier (used so that two nodes with the same sum are not considered equal), the set of states and the sequence used to go to that node.
+  storage = Dict() # Store information on nodes of the tree : height, lower bound of the distance to the closest leaf, a unique identifier (just in case), and the key in the fibonacci heap
 
-  visited = Set([])
+  s = initNode(α) # Root of the tree
+  b = bound(α, s, []) # Bound of the tree
+  key = Insert(toExplore, (b, identifier, s, [])) # Insert the root in the fibonacci heap
+  storage[s] = (0, b, identifier, key) # Store the root in storage
 
-  while length(toExplore) != 0
-      b, it, states, seq = pop!(toExplore) # Each node of the tree contains the associated lower bound, the number of the iteration (used so that two nodes with the same bound are not equal), the set of states and the sequence used to go to that node.
+  size = 1 # Always contains the number of nodes in the fibonacci heap
 
-    h = length(seq)
+  while size != 0
+    # There are nodes that need to be explored
 
-    if(h >= best || states ∈ visited)
-      nbCut += 1
-      #println("X")
-      continue
-    end
-    #println()
+    hb, it, states, seq = ExtractMin(toExplore).value 
+    # hb : sum of the height of the node plus a lower bound to the distance to the closest leaf
+    # it : a unique identifier, used by the heap in case there are two nodes with the same sum
+    # states : set of states associated with that node
+    # seq : sequences of inputs leading to that node from the root
 
-    nbExplore += 1
-    push!(visited, states)
+    size -= 1 # There is one node less in the heap
+    h = length(seq) # Height of the node
+
+    nbExplore += 1 # One new node was explored
     
-    if(stop(states))
-      if h < best
-        best = h
-      end
-      break
+    if(length(states) == 1)
+        # The node is the first leaf we encounter : we stop the algorithm
+        return nbExplore, 0, h
     end
-
-    if(leaf(states)) # We should never go here, as stop(states) and leaf(states) usually return the same thing
-      if h < best
-        best = h
-      end
-      continue
+    
+    if(length(states) == 2)
+        # (Works when the bound is the maximum merging sequence, if states contains two states, the merging sequence is exactly the synchronizing sequence)
+        return nbExplore, 0, h
     end
 
     for (i, neighbor) in neighbors(α, states)
-      if(neighbor ∉ keys(bounds))
-        bounds[neighbor] = bound(α, neighbor, seq) # We compute the bound of hte neighbor if and only if it was not already computed.
-      end
-      if(bounds[neighbor] + 1 < bounds[states]) # It is possible that a successor has a bound greater than the bound of states minus 1 (because of the formula of the bound does not depend on 'states'). In that case, we decrease the bound of the successor
-        bounds[neighbor] = bounds[states] - 1
-      end
-      iteration += 1
-      push!(toExplore, (h + bounds[neighbor], iteration, neighbor, vcat(seq, [i])))
+        hbn = get(storage, neighbor, nothing) # Return nothing if neighbor was never stored and the stored value otherwise
+        if(isnothing(hbn))
+            # We compute the bound of the neighbor if and only if it was not already computed.
+            identifier += 1
+            b = bound(α, neighbor, seq)
+            key = Insert(toExplore, (h + 1 + b, identifier, neighbor, vcat(seq, [i])))
+            storage[neighbor] = (h + 1, b, identifier, key)
+            size += 1
+        else
+            # hbn contains : the last seen height of the node, its bound, a unique identifier and the key in the fibonacci heap
+            hn, bn, idn, keyn = hbn
+            if(h + 1 < hn)
+                # If the height is better than before, we decrease the key in the heap
+                DecreaseKey(toExplore, keyn, (h + 1 + bn, idn, neighbor, vcat(seq, [i])))
+                storage[neighbor] = (h + 1, bn, idn, key)
+            end
+        end
+
     end
 
   end
-  return nbExplore, nbCut, best
+  return nbExplore, 0, Inf32
 end
 
 """Search tree to search for an SS of α, using a depht first search and a branch and bound algorithm. At each iteration, we explore the left-most unexplored node. initNode, neighbors, leaf, and bound are functions that can be used to respectively build the root, find the successors of a node in the tree, check if a node is a leaf, and compute the lower bound of a node."""
@@ -483,7 +494,7 @@ end
 function tests()
 
   NB_TESTS = 30 
-  ns = [20]  # Size of the tested automatas
+  ns = [50]  # Size of the tested automatas
   nis = [2]#, 3, 4]  # Size of the tested alphabets. For each value in nis and each n in ns a bunch of NB_TESTS automatas are build
 
   # To store which algorithm explore less number of nodes that which algorithm 
@@ -534,7 +545,7 @@ function tests()
         #nbExplore2, nbCut2, v2 = dfSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBoundRadius)
         #nbExplore3, nbCut3, v3 = dfSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBoundPL)
         # time = @elapsed((nbExplore4, nbCut4, v4) = bestSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBoundRadius, ssStop))
-        time = @elapsed((nbExplore4, nbCut4, v4) = bestSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBound, ssStop))
+        time = @elapsed((nbExplore4, nbCut4, v4) = bestSearchFibo(α, ssInitNode, ssNeighbors, ssBound))
         println(time, ' ',nbExplore4, ' ', v4)
         #nbExplore5, nbCut5, v5 = bestSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBoundPL, ssStop)
         
@@ -715,5 +726,5 @@ function test2()
 
 end
 
-test2()
+tests()
 
