@@ -220,16 +220,18 @@ int mergSeq(FSM *fsm, int s1, int s2){
 }
 
 // compute max merging seq (lower bound) for states s
-int maxMS(FSM *fsm, int *s){
+int maxMS(FSM *fsm, int *s, int** ms){
 
 	int res = -1;
 	for (int i=0; i<fsm->s; i++) {
+                if(!s[i])
+                    continue;
 		for (int j=i+1; j<fsm->s; j++) {
-			if (s[i] && s[j]) {
-				int tmp = mergSeq( fsm, i, j ) ;
-				if (tmp > res)
-					res = tmp;
-			}
+			if (!s[j])
+                            continue;
+                        int tmp = ms[i][j] ;
+                        if (tmp > res)
+                                res = tmp;	
 		}
 	}
 
@@ -268,7 +270,6 @@ int syncTree(FSM *fsm, int* res) {
 		front_q++; 
 
                 int* states = queue[current]; 
-
                 int added = add(visited, states);
                 if(added == 0)
                     continue;
@@ -402,17 +403,20 @@ int bestSearch(FSM *fsm, int *res){
 		//free(queue.top());
 		queue.pop();
 		//printf("\ncurrent: %d\n", tmp[0]);
-		
-		int* states = (int*)malloc( sizeof(int) * fsm->s );	
+   
+                // tmp = (h + lb) (etats : 1 0 1 0 0 ... 0) (taille de seq) (seq : 1 0 0 0 1 ...) 
+
+		/*int* states = (int*)malloc( sizeof(int) * fsm->s );	
 		for (int i=0; i<fsm->s; i++) {
 			states[i] = tmp[i+1];
 			//printf("%d ", states[i]);
 		}
 		//printf("\n");
+		*/
+
+		int* states = tmp+1;
 		
-		//int* states = tmp+1;
-		
-		// size of current seq
+                // size of current seq
 		int seq_size = tmp[fsm->s+1];
 		
                 int k, tmp_cpt = 0;
