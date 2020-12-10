@@ -268,7 +268,6 @@ int syncTree(FSM *fsm, int* res) {
 		front_q++; 
 
                 int* states = queue[current]; 
-
                 int added = add(visited, states);
                 if(added == 0)
                     continue;
