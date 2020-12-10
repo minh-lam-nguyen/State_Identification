@@ -3,12 +3,13 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <queue>
 #include "data_structures/set.h"
 
 #define NB_SUCC 2 // nb of successors
 #define TAILLE_MAX 50 // readfile and filename
 #define SIZE 150 // res
-#define SIZE_Q 1000000
+#define SIZE_Q 10000000
 
 typedef struct {
 	int type;
@@ -149,11 +150,11 @@ int mergSeq(FSM *fsm, int s1, int s2){
 		return -1;
 	int front_q = 0;
 	int back_q = 1;
+
 	queue[0] = (int*)malloc( 3 * sizeof(int) );
 	queue[0][0] = s1;
 	queue[0][1] = s2;
 	queue[0][2] = 0;
-	//printf("q: %d %d %d\n", queue[0][0], queue[0][1], queue[0][2]);
 
 	// elem of visited: ( state1, state2 )
 	Set visited = initSet(2);
@@ -162,16 +163,17 @@ int mergSeq(FSM *fsm, int s1, int s2){
 
 		int current = front_q;
 		front_q++;
-		//printf("current/f/b: %d %d %d\n", current, front_q, back_q);
+		//printf("\ncurrent/f/b: %d %d %d\n", current, front_q, back_q);
 
 		int *tmp = queue[current];
 		//printf("tmp: %d %d %d\n", tmp[0], tmp[1], tmp[2]);
 
 		// s1 and s2 merged 
 		if (tmp[0] == tmp[1]){
+			int res = tmp[2];
 			clear_QV(queue, back_q);
-            freeSet(visited);
-			return tmp[2];
+            		freeSet(visited);
+			return res;
 		}
 
 		// if (j,i) and i<j, always add (i,j) to visited
@@ -181,7 +183,13 @@ int mergSeq(FSM *fsm, int s1, int s2){
 			tmp[1] = temp;
 		}
 
-		int vis[] = {tmp[0], tmp[1]};
+		//int vis[2] = {tmp[0], tmp[1]};
+		int *vis = (int*)malloc( 2 * sizeof(int) );
+		vis[0] = tmp[0];
+		vis[1] = tmp[1];
+		//printf("vis: %d %d\n", vis[0], vis[1]);
+
+		//printf("find: %d\n", find(visited, vis));
 		int added = add(visited, vis);
 		//printf("added: %d\n", added);
 
@@ -196,6 +204,7 @@ int mergSeq(FSM *fsm, int s1, int s2){
 
         // add successors to queue
         for (int i=0; i<fsm->i; i++){
+        	//printf("add to q: %d %d %d\n", fsm->succ[tmp[0]][i], fsm->succ[tmp[1]][i], tmp[2]+1);
 	        queue[back_q] = (int*)malloc( 3 * sizeof(int) );
         	queue[back_q][0] = fsm->succ[tmp[0]][i];
         	queue[back_q][1] = fsm->succ[tmp[1]][i];
@@ -206,19 +215,21 @@ int mergSeq(FSM *fsm, int s1, int s2){
 	}
 
 	clear_QV(queue, back_q);
-    freeSet(visited);
+    	freeSet(visited);
 	return -1;
 }
 
-// compute max min merging seq 
-int maxMS(FSM *fsm){
+// compute max merging seq (lower bound) for states s
+int maxMS(FSM *fsm, int *s){
 
 	int res = -1;
 	for (int i=0; i<fsm->s; i++) {
 		for (int j=i+1; j<fsm->s; j++) {
-			int tmp = mergSeq( fsm, i, j ) ;
-			if (tmp > res)
-				res = tmp;
+			if (s[i] && s[j]) {
+				int tmp = mergSeq( fsm, i, j ) ;
+				if (tmp > res)
+					res = tmp;
+			}
 		}
 	}
 
@@ -330,6 +341,172 @@ int syncTree(FSM *fsm, int* res) {
 	return -1;
 }
 
+struct CompareQ
+{
+    bool operator ()(int* e, int* f)
+    {
+        return e[0] > f[0];
+    }
+};
+
+void clear_priorityQ(std::priority_queue<int*, std::vector<int*>, CompareQ> queue) {
+	while (!queue.empty()) {
+		free(queue.top());
+		queue.pop();
+	}
+}
+
+// best Sync tree
+int bestSearch(FSM *fsm, int *res){
+
+	std::priority_queue<int*, std::vector<int*>, CompareQ> queue;
+
+/*
+	// test priority queue
+	int test1[5] = {4,0,1,0,1};
+	int test2[5] = {3,0,1,0,1};
+	printf("empty: %d\n", queue.empty());
+	queue.push(test1);
+	queue.push(test2);
+	printf("empty: %d\n", queue.empty());
+	printf("%d\n", queue.top()[0]);
+	queue.pop();
+	printf("%d\n", queue.top()[0]);
+	queue.pop();
+	printf("empty: %d\n", queue.empty());
+*/
+
+	// visited set of states
+   	Set visited = initSet(fsm->s);
+
+	// add set of all state (init) on queue
+	int* initS = (int*)malloc( (SIZE + 2 + fsm->s) * sizeof(int) );
+
+	initS[0] = 0;
+	int j;
+	for(j=1; j<fsm->s+1; j++)
+            initS[j] = 1;
+            
+	for(j=fsm->s+1; j<SIZE + 2 + fsm->s; j++)
+            initS[j] = 0;
+            
+
+	queue.push(initS);
+	
+	//printf("%d\n", queue.top()[0]);
+	
+	
+	while (!queue.empty()) {
+
+		int* tmp = queue.top();
+		//free(queue.top());
+		queue.pop();
+		//printf("\ncurrent: %d\n", tmp[0]);
+		
+		int* states = (int*)malloc( sizeof(int) * fsm->s );	
+		for (int i=0; i<fsm->s; i++) {
+			states[i] = tmp[i+1];
+			//printf("%d ", states[i]);
+		}
+		//printf("\n");
+		
+		//int* states = tmp+1;
+		
+		// size of current seq
+		int seq_size = tmp[fsm->s+1];
+		
+                int k, tmp_cpt = 0;
+                for(k=0; k<fsm->s; k++)
+                    if (states[k] == 1)
+                        tmp_cpt++;
+
+                // if singleton (1 and only one state) : SS
+                if (tmp_cpt==1) {
+                    for(k=0; k<seq_size ;k++)
+                        res[k] = tmp[k+fsm->s+2];
+//                    clear_QV(queue, back_q);
+                    clear_priorityQ(queue);
+                    freeSet(visited);
+                    return seq_size;
+                }
+		
+		
+		int added = add(visited, states);
+		//printf("added: %d\n", added);
+                if(added == 0) {
+                	//free(queue.top());
+			//queue.pop();
+			free(tmp);
+			continue;
+                    }
+                if(added == -1){
+                    printf("ERREUR CAPACITE ATTEINTE\n");
+                    break;
+                }
+               
+
+		// c0 and c1 successors of current
+		int *c0 = (int*)malloc( (fsm->s) * sizeof(int) );
+		int *c1 = (int*)malloc( (fsm->s) * sizeof(int) );
+		
+		int j;
+		for (j=0; j<fsm->s; j++) {
+                    c0[j] = 0;
+                    c1[j] = 0;
+		}
+
+		for (j=0; j<fsm->s; j++) {
+                    if (states[j]) {
+                        c0[ fsm->succ[j][0] ] = 1;
+                        c1[ fsm->succ[j][1] ] = 1;
+                    }
+		}
+                int* succs[2] = {c0, c1};
+                
+                for(int symbol = 0; symbol < 2; symbol++){
+                    int* successor = succs[symbol];
+                    int inVisited = find(visited, successor);
+
+                    if(inVisited == 1){
+                        //free(successor);
+                        continue;
+
+                    }
+			
+                    //printf("add: ");
+                    int* addQ = (int*)malloc( (SIZE + 2 + fsm->s) * sizeof(int) );
+                    addQ[0] = tmp[fsm->s + 1] + maxMS(fsm, successor);
+                    //printf("%d ", addQ[0]);
+                    for (k=0; k<fsm->s; k++){
+                    	addQ[k+1] = successor[k];
+                    	//printf("%d ", addQ[k+1]);
+                    	}
+                    addQ[fsm->s+1] = seq_size+1;
+                    //printf("%d ", addQ[fsm->s+1]);
+                    for (k=0; k<seq_size; k++){
+                    	addQ[k+fsm->s+2] = tmp[k+fsm->s+2];
+                    	//printf("%d ", addQ[k+fsm->s+2]);
+                    	}
+                    addQ[k+fsm->s+2] = symbol;
+                    //printf("%d\n", addQ[k+fsm->s+2]);
+                    queue.push(addQ);
+                    //printf("qtop %d\n", queue.top()[0]);
+                    
+                    //free(successor);
+		}
+		
+		free(states);
+		free(c0);
+		free(c1);
+		
+		//free(queue.top());
+		//queue.pop();
+		free(tmp);
+		//printf("size: %ld\n",queue.size());	
+	}
+
+	return -1;
+}
 
 
 int test_ST() {
@@ -338,17 +515,17 @@ int test_ST() {
 	//float total = 0, ttl = 0;
 	clock_t beg = clock();
 
-	for (i=1; i<=1; i++) {
-	/*	    	
-            char tmp[TAILLE_MAX] = "data/SS_50fsm_n100/fsm";
+	for (i=1; i<=50; i++) {
+		    	
+        char tmp[TAILLE_MAX] = "./data/SS_50fsm_n20/fsm_n20_";
 		char numb[10];
-                sprintf(numb, "%d", i);
-                strcat(tmp, numb);
+        sprintf(numb, "%d", i);
+        strcat(tmp, numb);
 		strcat( tmp, ".fsm" );
 
-	    */
-                const char* tmp = "data/fsm_n20_1.fsm";
-                //printf("%s\n", tmp );
+	    
+        //const char* tmp = "../data/fsm_hss.fsm";
+        ////printf("%s\n", tmp );
 
 		FSM * fsm = readFSM(tmp);
 		//printFSM(fsm);
@@ -359,7 +536,8 @@ int test_ST() {
 
 		int res[SIZE];
 		//syncTree(fsm, res);
-		int taille = syncTree(fsm, res);
+		//int taille = syncTree(fsm, res);
+		int taille = bestSearch(fsm, res);
 
 		//time_t end = time(NULL);
 		clock_t e = clock();
@@ -387,15 +565,16 @@ int test_ST() {
 
 	clock_t end = clock();
 	double ttl = (double)(end-beg)* 1000 / CLOCKS_PER_SEC;
-	printf("total time: %f ms / average: %f ms (%d fsm)", ttl, ttl/(i-1), i-1);
+	printf("total time: %f ms / average: %f ms (%d fsm)\n", ttl, ttl/(i-1), i-1);
 
 	return 0;
 
 }
 
+
 int test_ms() {
 
-	char* tmp = "data/fsm_hss.fsm";
+	char tmp[TAILLE_MAX] = "./data/fsm_hss.fsm";
     printf( "%s\n", tmp );
 
 	FSM * fsm = readFSM(tmp);
@@ -403,16 +582,34 @@ int test_ms() {
 
 	printf( "MS(0,1): %d\n", mergSeq(fsm, 0, 1) );	
 	printf( "MS(0,2): %d\n", mergSeq(fsm, 0, 2) );	
-	printf( "MS(0,3): %d\n", mergSeq(fsm, 0, 3) );	
-	printf( "maxMS: %d\n", maxMS(fsm) );
+	printf( "MS(0,3): %d\n", mergSeq(fsm, 0, 3) );
+	int tmpS[5] = {1,1,1,1,1};
+	//int tmpS[5] = {1,1,1,0,0};	
+	printf( "maxMS: %d\n", maxMS(fsm, tmpS) );
 
 	return 0;
 }
 
+int test_best() {
+
+	char tmp[TAILLE_MAX] = "./data/fsm_n20_1.fsm";
+    	printf( "%s\n", tmp );
+
+	FSM * fsm = readFSM(tmp);
+	//printFSM(fsm);
+
+	int res[TAILLE_MAX];
+
+	printf("best: %d\n", bestSearch(fsm, res));
+
+	return 0;
+}
 
 int main() {
 
-	test_ms();
+	test_ST();
+	//test_ms();
+	//test_best();
 
 	return 0;
 }
