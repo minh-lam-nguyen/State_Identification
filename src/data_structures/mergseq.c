@@ -2,10 +2,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+struct s_triple{
+    int a;
+    int b;
+    int c;
+};
+typedef struct s_triple triple;
 
 struct mergseq_ {
-	int **ms;
+    int **ms;
+    triple * triples;   
 };
+
 
 // compute min merging seq for (s1,s2), with s1 <= s2
 // return length of merging seq for (s1, s2), -1 if no merging (or error)
@@ -95,52 +103,84 @@ int mergSeq(FSM fsm, int s1, int s2){
 	return -1;
 }
 
+int cmpTriples(const void * a, const void * b){
+    triple ta = *(triple *)a;
+    triple tb = *(triple *)b;
+    return tb.c - ta.c;
+}
+
+
 // compute merging seq for all couple of states and store it in ms
 void getMergSeq(FSM fsm, MergSeq mergs){
 
-	for (int i=0; i<get_s(fsm)-1; i++)
-		for (int j=i+1; j<get_s(fsm); j++)
-			mergs->ms[i][j] = mergSeq(fsm, i, j);
+    int count = 0;
+    for (int i=0; i<get_s(fsm)-1; i++){
+        for (int j=i+1; j<get_s(fsm); j++){
+            int ms = mergSeq(fsm, i, j);
+            mergs->ms[i][j] = ms;
+            mergs->triples[count].a = i;
+            mergs->triples[count].b = j;
+            mergs->triples[count].c = ms;
+            count++;
+        }
+    }
+
+    qsort(mergs->triples, count, sizeof(triple), cmpTriples);
 }
 
 
 MergSeq initMS(FSM fsm){
+    MergSeq mergs = (MergSeq)malloc( sizeof(struct mergseq_) );
+    int size = get_s(fsm);
 
-	MergSeq mergs = (MergSeq)malloc( sizeof(struct mergseq_) );
+    mergs->ms = (int**)malloc( size * sizeof(int*) );
+    mergs->triples = (triple *) malloc(sizeof(triple) * size * (size - 1) / 2);
 
-	mergs->ms = (int**)malloc( get_s(fsm) * sizeof(int*) );
-	for (int i=0; i<get_s(fsm); i++)
-		mergs->ms[i] = (int*)malloc( get_s(fsm) * sizeof(int) );
+    for (int i=0; i<size; i++)
+            mergs->ms[i] = (int*)malloc( size * sizeof(int) );
 
-	getMergSeq(fsm, mergs);
+    getMergSeq(fsm, mergs);
 
-	return mergs;
+    return mergs;
 }
 
-void freeMS(MergSeq mergs, int size){
 
+void freeMS(MergSeq mergs, int size){
 	for(int i=0; i<size; i++)
 		free(mergs->ms[i]);
 	free(mergs->ms);
+        free(mergs->triples);
 }
 
 
 
 // compute max merging seq (lower bound) for states s
-int maxMS(MergSeq mergs, int size, int *s){
+int maxMSLinear(MergSeq mergs, int size, int *s){
 
-	int res = -1;
-	for (int i=0; i<size; i++) {
+    int res = -1;
+    for (int i=0; i<size; i++) {
         if(!s[i])
             continue;
-		for (int j=i+1; j<size; j++) {
-			if (!s[j])
+
+        for (int j=i+1; j<size; j++) {
+            if (!s[j])
                 continue;
             int tmp = mergs->ms[i][j] ;
             if (tmp > res)
                 res = tmp;	
-		}
-	}
+        }
+    }
 
-	return res;
+    return res;
+}
+
+int maxMSSorted(MergSeq mergs, int size, int* s){
+    int n = size * (size - 1) / 2;
+    for(int i = 0; i < n; i++){
+        triple t = mergs->triples[i];
+        if(s[t.a] != 1 || s[t.b] != 1)
+            continue;
+        return t.c;
+    }
+    return 0;
 }

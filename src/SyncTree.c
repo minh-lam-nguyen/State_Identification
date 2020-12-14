@@ -257,7 +257,7 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
             //printf("addQ: ");
 
             int* addQ = (int*)malloc( (SIZE + 2 + get_s(fsm)) * sizeof(int) );
-            addQ[0] = tmp[get_s(fsm) + 1] + maxMS(mergs, get_s(fsm), successor);
+            addQ[0] = tmp[get_s(fsm) + 1] + maxMSSorted(mergs, get_s(fsm), successor);
             //printf("%d ", addQ[0]);
             for (k=0; k<get_s(fsm); k++){
             	addQ[k+1] = successor[k];
@@ -392,7 +392,7 @@ int test_best() {
 // test MergSeq and maxMS
 int test_allms() {
 
-	//char tmp[SIZE] = "./data/fsm_hss.fsm";
+        //char tmp[SIZE] = "./data/fsm_hss.fsm";
 	char tmp[SIZE] = "./data/fsm_n20_1.fsm";
 
     printf( "%s\n", tmp );
@@ -402,9 +402,10 @@ int test_allms() {
 
 	MergSeq mergs = initMS(fsm);
 
-	int tmpS[5] = {1,1,1,1};
-	//int tmpS[5] = {0,1,1,1};
-	printf( "maxMS: %d\n", maxMS(mergs, get_s(fsm), tmpS) );
+	int tmpS[20] = {0,1,0,1, 1};
+	//int tmpS[] = {0,1,1,1};
+	printf( "maxMS: %d\n", maxMSLinear(mergs, get_s(fsm), tmpS) );
+	printf( "maxMS: %d\n", maxMSSorted(mergs, get_s(fsm), tmpS) );
 
 	freeMS(mergs, get_s(fsm));
 	freeFSM(fsm);
@@ -414,9 +415,9 @@ int test_allms() {
 
 int main() {
 
-	test_time();
+	//test_time();
 	
-	//test_best();
+	test_best();
 	//test_allms();
 
 	return 0;
