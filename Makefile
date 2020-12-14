@@ -1,8 +1,11 @@
 CC=g++ -g -Wall -Wextra
 
-all: SyncTree_hashset
+all: SyncTree_dhashset
 
 SyncTree_hashset: obj/SyncTree.o obj/data_structures/set.o obj/data_structures/fsm.o obj/data_structures/mergseq.o
+	$(CC) -o bin/$@ $^
+
+SyncTree_dhashset: obj/SyncTree.o obj/data_structures/set_dynamic.o obj/data_structures/fsm.o obj/data_structures/mergseq.o
 	$(CC) -o bin/$@ $^
 
 SyncTree_vector: obj/SyncTree.o obj/data_structures/set_vector.o
