@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define HASH_SIZE 4
-#define SIZE_V 10
+#define HASH_SIZE 4091
+#define SIZE_V 1000
 
 struct s_set{
     int current_hash_index;

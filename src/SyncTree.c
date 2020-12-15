@@ -292,6 +292,112 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
 }
 
 
+// best Sync tree with heap and storage
+int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
+
+    std::priority_queue<int*, std::vector<int*>, CompareQ> queue;
+    // visited set of states
+    Set storage = initSet(get_s(fsm), 1);
+
+    // add set of all state (init) on queue
+    int* initS = (int*)malloc( (2 + get_s(fsm)) * sizeof(int) );
+
+    initS[0] = 0;
+    int j;
+
+    for(j=1; j<get_s(fsm)+1; j++)
+        initS[j] = 1;
+        
+    for(j=get_s(fsm)+1; j<2 + get_s(fsm); j++)
+        initS[j] = 0;
+        
+    queue.push(initS);
+            
+    while (!queue.empty()) {
+
+        int* states = queue.top();
+        queue.pop();
+
+        // size of current seq
+        int seq_size = states[get_s(fsm)+1];
+		
+        int k, tmp_cpt = 0;
+        for(k=0; k<get_s(fsm); k++){
+            if (states[k + 1] == 1)
+                tmp_cpt++;
+            if (tmp_cpt == 3)
+                break;
+        }
+
+        // if singleton (1 and only one state) : SS
+        if (tmp_cpt==1) {
+            clear_priorityQ(queue);
+            freeSet(visited);
+            return seq_size;
+        }
+        
+        // if couple (2 states) : SS = current + MS
+        if (tmp_cpt==2) {
+            clear_priorityQ(queue);
+            freeSet(visited);
+            return states[0];
+        }
+    
+        /*
+        int added = add(visited, states);
+        if(added == 0) {
+            free(states);
+            continue;
+        }
+        if(added == -1){
+            printf("ERREUR CAPACITE ATTEINTE\n");
+            break;
+        }
+        */     
+
+        // c0 and c1 successors of current
+        int *c0 = (int*)malloc((2 + get_s(fsm)) * sizeof(int) );
+        int *c1 = (int*)malloc((2 + get_s(fsm)) * sizeof(int) );
+        
+        int j;
+        for (j=0; j < get_s(fsm); j++) {
+            c0[j + 1] = 0;
+            c1[j + 1] = 0;
+        }
+
+        for (j=0; j< get_s(fsm); j++) {
+            if (states[j + 1]) {
+                c0[ get_succ(fsm, j, 0) + 1] = 1;
+                c1[ get_succ(fsm, j, 1) + 1] = 1;
+            }
+        }
+
+        int* succs[2] = {c0, c1};
+                
+        for(int symbol = 0; symbol < 2; symbol++){
+            int* successor = succs[symbol];
+            int* succInVisited = addOrReturn(visited, successor);
+
+            if(succInVisited == successor){
+                successor[0] = seq_size + 1 + maxMSSorted(mergs, get_s(fsm), successor + 1);
+                successor[get_s(fsm) + 1] = seq_size + 1;
+            }
+            else{
+                int seq_size_n = succInVisited[get_s(fsm) + 1];
+                if(seq_size + 1 < seq_size_n){
+                    // UPDATE DANS QUEUE !!!
+                    succInVisited[0] -= seq_size_n - (seq_size + 1);
+                    succInVisited[get_s(fsm) + 1] -= seq_size_n - (seq_size + 1);
+                }
+                free(successor);
+            }
+            
+        }
+    }
+
+    return -1;
+}
+
 int test_time() {
 
 	int i;

@@ -7,9 +7,9 @@
 typedef struct s_set* Set;
 
 /**
- * Initialisation du Set, tous les éléments sont des int* de taille au moins size, seuls les size premiers entiers de chaque éléments sont utilisés pour vérifier l'unicité.
+ * Initialisation du Set, tous les éléments sont des int* de taille au moins size + offset, seuls les size entiers entre les indices offset et offset + size - 1 de chaque éléments sont utilisés pour vérifier l'unicité.
  */
-Set initSet(int size);
+Set initSet(int size, int offset);
 
 /**
  * Libération d'un Set
@@ -28,5 +28,7 @@ int add(Set s, int* e);
  * e doit être un pointeur sur au moins size entiers où size est la valeur donnée à l'initisalisation du set
  */
 int find(Set s, int* e);
+
+int* addOrReturn(Set s, int* e);
 
 #endif
