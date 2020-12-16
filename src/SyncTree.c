@@ -11,7 +11,6 @@
 #define SIZE 150 // res
 #define SIZE_Q 100000000
 
-
 #define INT_SIZE (int)(sizeof(int)*8-1)
 
 
@@ -368,7 +367,6 @@ int test_time() {
 
 		FSM fsm = initFSM(tmp);
 		//printFSM(fsm);
-
 
 		int res[SIZE];
 
