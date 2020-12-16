@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define HASH_SIZE 4096 
+#define HASH_SIZE 4091
 #define SIZE_V 1024
 
 struct s_set{
@@ -17,7 +17,8 @@ struct s_set{
 unsigned int hash(int* e, int size) {
     unsigned int res = 0;
     for(int i = 0; i < size; i++) {
-        res = res * 1997 + i * e[i];
+        //res = res * 1997 + i * e[i];
+        res = res * 1997 + e[i];
     }
     return res % HASH_SIZE;
 }

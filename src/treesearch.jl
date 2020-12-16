@@ -1,9 +1,16 @@
-println("Import libs")
+if !(@isdefined doimports)
+    doimports = false
+    println("Import libs")
+    include("util.jl")
+    include("data_structures/fiboheap.jl")
+    println("Finish")
+end
+
 using DataStructures
 using JuMP
 using SCIP
-println("Finish")
-
+using Dates
+using .FibonacciHeaps
 
 mutable struct Automata
   n::Int # Nb states
@@ -18,6 +25,25 @@ mutable struct Automata
 end
 
 Automata() = Automata(0, 0, DefaultDict(() -> []), DefaultDict(() -> []), Dict(), Dict(),Model(() -> SCIP.Optimizer(display_verblevel=0)), nothing, nothing) # Default constructor
+
+"""Build an automata from fsm (struct from util) """
+function generateAutomataFSM(fsm)
+  α = Automata()
+  α.n = fsm.s
+  α.ni = fsm.i
+  for s in 1:fsm.s
+    for i in 1:fsm.i
+      push!(α.τ[(s, i)], fsm.succ[s][i]+1)
+      push!(α.τm1[(fsm.succ[s][i]+1, i)], s)
+    end
+  end
+
+  buildMergingSequences(α)
+  buildbackwardMergingSequences(α)
+  buildPL(α) 
+
+  return α
+end
 
 """Build a deterministic automata with n states and an alphabet of size ni"""
 function generateDeterministic(n, ni)
@@ -336,7 +362,7 @@ function bestSearch(α, initNode, neighbors, leaf, bound, stop)
 
     nbExplore += 1
     push!(visited, states)
-    
+
     if(stop(states))
       if h < best
         best = h
@@ -359,14 +385,210 @@ function bestSearch(α, initNode, neighbors, leaf, bound, stop)
         bounds[neighbor] = bounds[states] - 1
       end
       iteration += 1
-      push!(toExplore, (h + bounds[neighbor], iteration, neighbor, vcat(seq, [i])))
+      push!(toExplore, (h + 1+ bounds[neighbor], iteration, neighbor, vcat(seq, [i])))
     end
 
   end
   return nbExplore, nbCut, best
 end
 
-"""Search tree to search for an SS of α, using a depht first search and a branch and bound algorithm. At each iteration, we explore the left-most unexplored node. initNode, neighbors, leaf, and bound are functions that can be used to respectively build the root, find the successors of a node in the tree, check if a node is a leaf, and compute the lower bound of a node."""
+
+""" Similar to best Search but do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not. If the key is decreased, insteaf of dupplicating in the heap, we decrease the key : each node is explore only once."""
+function bestSearchUniqueExplore(α, initNode, neighbors, bound)
+  nbExplore = 0 # Nb explored nodes
+  identifier = 0 # Used as a unique identifier of the keys in a heap
+  
+  toExplore = MutableBinaryMinHeap{Tuple{Int64,Int64,Set{Int64},Array{Any,1}}}() # Binary heap, to store the nodes of the tree sorted by the sum height + lower bound of the distance to the closest leaf. Each node of the tree is associated with that sum, a unique identifier (used so that two nodes with the same sum are not considered equal), the set of states and the sequence used to go to that node.
+  storage = Dict() # Store information on nodes of the tree : height, lower bound of the distance to the closest leaf, a unique identifier (just in case), and the key in the heap
+
+  s = initNode(α) # Root of the tree
+  b = bound(α, s, []) # Bound of the tree
+  key = push!(toExplore, (b, identifier, s, [])) # Insert the root in the heap
+  storage[s] = (0, b, identifier, key) # Store the root in storage
+
+  size = 1 # Always contains the number of nodes in the heap
+
+  while size != 0
+    # There are nodes that need to be explored
+
+    hb, it, states, seq = pop!(toExplore)
+    # hb : sum of the height of the node plus a lower bound to the distance to the closest leaf
+    # it : a unique identifier, used by the heap in case there are two nodes with the same sum
+    # states : set of states associated with that node
+    # seq : sequences of inputs leading to that node from the root
+
+    size -= 1 # There is one node less in the heap
+    h = length(seq) # Height of the node
+
+    nbExplore += 1 # One new node was explored
+    
+    if(length(states) == 1)
+        # The node is the first leaf we encounter : we stop the algorithm
+        return nbExplore, 0, h
+    end
+    
+    if(length(states) == 2)
+        # (Works when the bound is the maximum merging sequence, if states contains two states, the merging sequence is exactly the synchronizing sequence)
+        return nbExplore, 0, hb
+    end
+
+    for (i, neighbor) in neighbors(α, states)
+        hbn = get(storage, neighbor, nothing) # Return nothing if neighbor was never stored and the stored value otherwise
+        if(isnothing(hbn))
+            # We compute the bound of the neighbor if and only if it was not already computed.
+            identifier += 1
+            b = bound(α, neighbor, seq)
+            key = push!(toExplore, (h + 1 + b, identifier, neighbor, vcat(seq, [i])))
+            storage[neighbor] = (h + 1, b, identifier, key)
+            size += 1
+        else
+            # hbn contains : the last seen height of the node, its bound, a unique identifier and the key in the heap
+            hn, bn, idn, keyn = hbn
+            if(h + 1 < hn)
+                # If the height is better than before, we decrease the key in the heap
+                update!(toExplore, keyn, (h + 1 + bn, idn, neighbor, vcat(seq, [i])))
+                storage[neighbor] = (h + 1, bn, idn, keyn)
+            end
+        end
+
+    end
+
+  end
+  return nbExplore, 0, Inf32
+end
+
+
+""" Similar to best Search but use a fibonacci heap instead of a binaryheap. Also do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not. If the key is decreased, insteaf of dupplicating in the heap, we decrease the key : each node is explore only once."""
+function bestSearchFibo(α, initNode, neighbors, bound)
+  nbExplore = 0 # Nb explored nodes
+  identifier = 0 # Used as a unique identifier of the keys in a heap
+  
+  toExplore = MakeHeap() # Fibonacci heap, to store the nodes of the tree sorted by the sum height + lower bound of the distance to the closest leaf. Each node of the tree is associated with that sum, a unique identifier (used so that two nodes with the same sum are not considered equal), the set of states and the sequence used to go to that node.
+  storage = Dict() # Store information on nodes of the tree : height, lower bound of the distance to the closest leaf, a unique identifier (just in case), and the key in the fibonacci heap
+
+  s = initNode(α) # Root of the tree
+  b = bound(α, s, []) # Bound of the tree
+  key = Insert(toExplore, (b, identifier, s, [])) # Insert the root in the fibonacci heap
+  storage[s] = (0, b, identifier, key) # Store the root in storage
+
+  size = 1 # Always contains the number of nodes in the fibonacci heap
+
+  while size != 0
+    # There are nodes that need to be explored
+
+    hb, it, states, seq = ExtractMin(toExplore).value 
+    # hb : sum of the height of the node plus a lower bound to the distance to the closest leaf
+    # it : a unique identifier, used by the heap in case there are two nodes with the same sum
+    # states : set of states associated with that node
+    # seq : sequences of inputs leading to that node from the root
+
+    size -= 1 # There is one node less in the heap
+    h = length(seq) # Height of the node
+
+    nbExplore += 1 # One new node was explored
+    
+    if(length(states) == 1)
+        # The node is the first leaf we encounter : we stop the algorithm
+        return nbExplore, 0, h
+    end
+    
+    if(length(states) == 2)
+        # (Works when the bound is the maximum merging sequence, if states contains two states, the merging sequence is exactly the synchronizing sequence)
+        return nbExplore, 0, hb
+    end
+
+    for (i, neighbor) in neighbors(α, states)
+        hbn = get(storage, neighbor, nothing) # Return nothing if neighbor was never stored and the stored value otherwise
+        if(isnothing(hbn))
+            # We compute the bound of the neighbor if and only if it was not already computed.
+            identifier += 1
+            b = bound(α, neighbor, seq)
+            key = Insert(toExplore, (h + 1 + b, identifier, neighbor, vcat(seq, [i])))
+            storage[neighbor] = (h + 1, b, identifier, key)
+            size += 1
+        else
+            # hbn contains : the last seen height of the node, its bound, a unique identifier and the key in the fibonacci heap
+            hn, bn, idn, keyn = hbn
+            if(h + 1 < hn)
+                # If the height is better than before, we decrease the key in the heap
+                DecreaseKey(toExplore, keyn, (h + 1 + bn, idn, neighbor, vcat(seq, [i])))
+                storage[neighbor] = (h + 1, bn, idn, keyn)
+            end
+        end
+
+    end
+
+  end
+  return nbExplore, 0, Inf32
+end
+
+
+""" Similar to best Search but use a priority queue instead of a binaryheap. Also do not use a set visited to register all the visited sets. Instead use a dictionnary to store the keys of all the nodes. A visited node has a low key. We use that comparison to deduce if a node was visited or not. If the key is decreased, insteaf of dupplicating in the heap, we decrease the key : each node is explore only once."""
+function bestSearchPriorityQueue(α, initNode, neighbors, bound)
+  nbExplore = 0 # Nb explored nodes
+  identifier = 0 # Used as a unique identifier of the keys in a heap
+  
+  toExplore = PriorityQueue() # Priority Queue, to store the nodes of the tree sorted by the sum height + lower bound of the distance to the closest leaf. Each node of the tree is associated with that sum, a unique identifier (used so that two nodes with the same sum are not considered equal) and the sequence used to go to that node.
+  storage = Dict() # Store information on nodes of the tree : height, lower bound of the distance to the closest leaf, a unique identifier (just in case)
+
+  s = initNode(α) # Root of the tree
+  b = bound(α, s, []) # Bound of the tree
+  toExplore[s] = (b, identifier, []) # Insert the root in the priority queue
+  storage[s] = (0, b, identifier) # Store the root in storage
+
+  size = 1 # Always contains the number of nodes in the queue
+
+  while size != 0
+    # There are nodes that need to be explored
+
+    states, value = dequeue_pair!(toExplore)
+    hb, it, seq = value
+    # hb : sum of the height of the node plus a lower bound to the distance to the closest leaf
+    # it : a unique identifier, used by the heap in case there are two nodes with the same sum
+    # states : set of states associated with that node
+    # seq : sequences of inputs leading to that node from the root
+
+    size -= 1 # There is one node less in the heap
+    h = length(seq) # Height of the node
+
+    nbExplore += 1 # One new node was explored
+    
+    if(length(states) == 1)
+        # The node is the first leaf we encounter : we stop the algorithm
+        return nbExplore, 0, h
+    end
+    
+    if(length(states) == 2)
+        # (Works when the bound is the maximum merging sequence, if states contains two states, the merging sequence is exactly the synchronizing sequence)
+        return nbExplore, 0, hb
+    end
+
+    for (i, neighbor) in neighbors(α, states)
+        hbn = get(storage, neighbor, nothing) # Return nothing if neighbor was never stored and the stored value otherwise
+        if(isnothing(hbn))
+            # We compute the bound of the neighbor if and only if it was not already computed.
+            identifier += 1
+            b = bound(α, neighbor, seq)
+            toExplore[neighbor] = (h + 1 + b, identifier, vcat(seq, [i]))
+            storage[neighbor] = (h + 1, b, identifier)
+            size += 1
+        else
+            # hbn contains : the last seen height of the node, its bound and a unique identifier
+            hn, bn, idn = hbn
+            if(h + 1 < hn)
+                # If the height is better than before, we decrease the key in the queue
+                toExplore[neighbor] = (h + 1 + bn, idn, vcat(seq, [i]))
+                storage[neighbor] = (h + 1, bn, idn)
+            end
+        end
+
+    end
+
+  end
+  return nbExplore, 0, Inf32
+end
+
+"""Search tree to search for PriorityQueue{Any, Any}(), using a depht first search and a branch and bound algorithm. At each iteration, we explore the left-most unexplored node. initNode, neighbors, leaf, and bound are functions that can be used to respectively build the root, find the successors of a node in the tree, check if a node is a leaf, and compute the lower bound of a node."""
 function dfSearch(α, initNode, neighbors, leaf, bound)
 
   nbExplore = 0
@@ -462,7 +684,7 @@ end
 function tests()
 
   NB_TESTS = 30 
-  ns = [100]  # Size of the tested automatas
+  ns = [70]  # Size of the tested automatas
   nis = [2]#, 3, 4]  # Size of the tested alphabets. For each value in nis and each n in ns a bunch of NB_TESTS automatas are build
 
   # To store which algorithm explore less number of nodes that which algorithm 
@@ -471,6 +693,7 @@ function tests()
                 0 0 0 0 0 ; 
                 0 0 0 0 0 ; 
                 0 0 0 0 0]
+  
 
   # To store, when an algorithm explores less than another algorithm, how many nodes less did it explore.
   sume2me1 = [
@@ -489,9 +712,9 @@ function tests()
   nb_ignored_α = 0
   for n in ns
     for ni in nis
-      for number in 1:30
+      for number in 1:50
         index += 1
-        println(index, "/150");
+        println(index, "/50");
         α = generateDeterministic(n, ni)
         if(!hasMergingSequence(α))
           nb_ignored_α += 1
@@ -505,6 +728,9 @@ function tests()
         nbExplore3, nbCut3, v3 = 0, 0, 0
         nbExplore4, nbCut4, v4 = 0, 0, 0
         nbExplore5, nbCut5, v5 = 0, 0, 0
+        nbExplore6, nbCut6, v6 = 0, 0, 0
+        nbExplore7, nbCut7, v7 = 0, 0, 0
+        nbExplore8, nbCut8, v8 = 0, 0, 0
 
         # Do the measures
         
@@ -512,15 +738,20 @@ function tests()
         #println(time, ' ',nbExplore1, ' ',v1)
         #nbExplore2, nbCut2, v2 = dfSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBoundRadius)
         #nbExplore3, nbCut3, v3 = dfSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBoundPL)
-        # time = @elapsed((nbExplore4, nbCut4, v4) = bestSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBoundRadius, ssStop))
-        time = @elapsed((nbExplore4, nbCut4, v4) = bestSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBound, ssStop))
-        println(time, ' ',nbExplore4, ' ', v4)
+        time4 = @elapsed((nbExplore4, nbCut4, v4) = bestSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBound, ssStop))
+        println(time4, ' ',nbExplore4, ' ', v4)
         #nbExplore5, nbCut5, v5 = bestSearch(α, ssInitNode, ssNeighbors, ssLeaf, ssBoundPL, ssStop)
+        time6 = @elapsed((nbExplore6, nbCut6, v6) = bestSearchFibo(α, ssInitNode, ssNeighbors, ssBound))
+        println(time6, ' ',nbExplore6, ' ', v6)
+        time7 = @elapsed((nbExplore7, nbCut7, v7) = bestSearchPriorityQueue(α, ssInitNode, ssNeighbors, ssBound))
+        println(time7, ' ',nbExplore7, ' ', v7)
+        time8 = @elapsed((nbExplore8, nbCut8, v8) = bestSearchUniqueExplore(α, ssInitNode, ssNeighbors, ssBound))
+        println(time8, ' ',nbExplore8, ' ', v8)
         
         # Check if there is an error
-        if(length(Set([v1, v2, v3, v4, v5])) != 1)
+        if(length(Set([v4, v6, v7, v8])) != 1)
           errors += 1
-          #=
+          
           printAutomata(α)
 
           println(α.τm1)
@@ -537,7 +768,7 @@ function tests()
           println("BestMS : ", v4)
           println("BestPL : ", v5)
           return
-          =#
+          
         else
           # Count which algorithms explored less
           explores = [nbExplore1, nbExplore2, nbExplore3, nbExplore4, nbExplore5]
@@ -579,10 +810,11 @@ function tests()
       println("Errors : ", errors)
       println()
     end
+      display(exploreWin)
   end
 end
 
-tests()
+#tests()
 
 
 #=
@@ -625,3 +857,73 @@ println(nbExplore2, " ", nbCut2, " ", v2)
 println(nbExplore3, " ", nbCut3, " ", v3)
 println(nbExplore4, " ", nbCut4, " ", v4)
 =#
+
+
+function test2()
+
+  fsm = read_fsm("../data/cerny_fsm/cerny_n20.fsm")
+  #println(fsm)
+  
+  a = generateAutomataFSM(fsm)
+  #printAutomata(a)
+
+  debms = Dates.now()
+  nbExplore, nbCut, res = bestSearch(a, ssInitNode, ssNeighbors, ssLeaf, ssBound, ssStop)
+  finms = Dates.now()
+  println("explore: ", nbExplore,  "time: ", Dates.value(finms-debms), "ms")
+
+
+#=
+  dir_fsm = "../data/SS_50fsm_n100/"
+  list_fsm = readdir(dir_fsm)
+
+  count_fsm = 0
+  ttl_PL = 0
+  ttl_rayon = 0
+  ttl_ms = 0
+
+  for i in list_fsm
+    if occursin( ".fsm", i )
+      #println(dir_fsm*i)
+      fsm = read_fsm(dir_fsm*i)
+      a = generateAutomataFSM(fsm)
+      count_fsm += 1
+
+      if(!hasMergingSequence(a))
+        continue
+      end
+      
+      #=
+      debPL = Dates.now()
+      nbExplore, nbCut, res = bestSearch(a, ssInitNode, ssNeighbors, ssLeaf, ssBoundPL, ssStop)
+      finPL = Dates.now()
+      println("fsm: ", i, " time: ", Dates.value(finPL-debPL), "ms")
+
+      debrayon = Dates.now()
+      nbExplore, nbCut, res = bestSearch(a, ssInitNode, ssNeighbors, ssLeaf, ssBoundRadius, ssStop)
+      finrayon = Dates.now()
+      println("fsm: ", i, " time: ", Dates.value(finrayon-debrayon), "ms")
+      =#
+
+      debms = Dates.now()
+      nbExplore, nbCut, res = bestSearch(a, ssInitNode, ssNeighbors, ssLeaf, ssBound, ssStop)
+      finms = Dates.now()
+      println("fsm: ", i, " time: ", Dates.value(finms-debms), "ms")
+
+      if (count_fsm != 1)
+        #ttl_PL += Dates.value(finPL-debPL)
+        #ttl_rayon += Dates.value(finrayon-debrayon)
+        ttl_ms += Dates.value(finms-debms)
+      end
+    end
+  end
+  println("total time ms: ", ttl_ms, "ms  average: ", ttl_ms/count_fsm, "ms")
+=#
+
+  #println("total time PL: ", ttl_PL, "ms  average: ", ttl_PL/count_fsm, "ms")
+  #println("total time rayon: ", ttl_rayon, "ms  average: ", ttl_rayon/count_fsm, "ms")
+
+end
+
+tests()
+
