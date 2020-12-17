@@ -15,7 +15,7 @@ typedef struct s_heap* Heap;
  * La première contient la clef permettant de placer l'élément dans le tas et la seconde contient
  * l'indice du int* dans le tas.
  */
-Heap initHeap(int keyIndex, int achorIndex);
+Heap initHeap(int keyIndex, int anchorIndex);
 
 /**
  * Libération d'un Heap

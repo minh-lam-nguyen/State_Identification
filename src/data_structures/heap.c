@@ -43,7 +43,7 @@ void bubbleUp(Heap h, int* e){
     while(1){
         if(index == 0)
             return;
-        int fIndex = index / 2;
+        int fIndex = (index - 1) / 2;
         int* f = h->h[fIndex];
         if(f[h->kI] > e[h->kI]){
             swap(h, index, fIndex);
@@ -61,7 +61,7 @@ void bubbleDown(Heap h, int* e){
     int index = e[h->aI];
     
     while(1){
-        int lIndex = index * 2;
+        int lIndex = index * 2 + 1;
         int rIndex = lIndex + 1;
         int fIndex = -1;
         int fKey = -1;
