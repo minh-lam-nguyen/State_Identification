@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_NB_STATES 500
 #define NB_SUCC 2 // nb of successors
 #define TAILLE_MAX 50 // readfile and filename
 
@@ -12,7 +13,9 @@ struct fsm_{
 	int s;
 	int i;
 	int p;
-	int succ[][NB_SUCC];
+	int succ[MAX_NB_STATES][NB_SUCC];
+        int predsSizes[MAX_NB_STATES][NB_SUCC];
+        int preds[MAX_NB_STATES][NB_SUCC][MAX_NB_STATES];
 };
 
 
@@ -28,10 +31,16 @@ FSM setFSM(int s, int i, int** trans) {
 
 	int j;
 	for (j=0; j<s; j++)
-	{
-		f->succ[j][0] = trans[j][0];
-		f->succ[j][1] = trans[j][1];
-	}
+            for(int k = 0; k < i; k++)
+                f->predsSizes[j][k] = 0;
+	
+        for (j=0; j<s; j++){
+            for(int k = 0; k < i; k++){
+	        int succ = f->succ[j][k] = trans[j][k];
+                f->predsSizes[succ][k]++;
+                f->preds[succ][k][f->predsSizes[succ][k]] = j;
+            }
+	}   
 	
 	return f;
 }
@@ -141,4 +150,12 @@ int get_i(FSM f){
 // return successor of s after applying input i
 int get_succ(FSM f, int s, int i) {
 	return f->succ[s][i];
+}
+
+int get_nb_preds(FSM f, int s, int i){
+    return f->predsSizes[s][i];
+}
+
+int get_pred(FSM f, int s, int i, int pred_index){
+    return f->preds[s][i][pred_index];
 }
