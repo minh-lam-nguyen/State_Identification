@@ -1,30 +1,30 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "data_structures/set.h"
+#include "data_structures/heap.h"
 
 int main(void){
-   Set s = initSet(4);
+   Heap s = initHeap(0, 2);
 
-   int a1[4] = {1,1,1,1};
-   int a2[4] = {1,0,1,1};
-   int a3[4] = {1,1,0,1};
-   int a4[4] = {1,0,1,1};
-   int a5[4] = {1,1,0,1};
+   int a1[4] = {4,1,1,6};
+   int a2[4] = {3,2,1,7};
+   int a3[4] = {2,3,0,8};
+   int a4[4] = {7,4,1,9};
+   int a5[4] = {2,5,0,10};
 
-   int d1 = add(s, a1);
-   int d2 = add(s, a2);
-   int d3 = add(s, a3);
-   int d4 = add(s, a4);
-   int d5 = add(s, a5);
+   int d1 = insertToHeap(s, a1); 
+   int d2 = insertToHeap(s, a2);
+   int d3 = insertToHeap(s, a3);
+   int d4 = insertToHeap(s, a4);
+   int d5 = insertToHeap(s, a5);
 
    printf("%d %d %d %d %d\n", d1, d2, d3, d4, d5);
 
-   int e1 = find(s, a1);
-   int e2 = find(s, a2);
-   int e3 = find(s, a3);
-   int e4 = find(s, a4);
-   int e5 = find(s, a5);
-   printf("%d %d %d %d %d\n", e1, e2, e3, e4, e5);
+    decreaseKey(s, a1, 1);
 
-   freeSet(s);
+    for(int i = 0; i < 5; i++){
+        int* a = popMinimum(s);
+        printf("%d %d %d %d\n", a[0], a[1], a[2], a[3]);
+    }
+
+   freeHeap(s);
 }

@@ -17,13 +17,10 @@ SyncTree_stlset: obj/SyncTree.o obj/data_structures/set_stl.o
 SyncTree_unorderedset: obj/SyncTree.o obj/data_structures/unordered_set.o
 	$(CC) -o bin/$@ $^
 
-test_hashset: obj/test.o obj/data_structures/set.o
+test_heap: obj/test.o obj/data_structures/heap.o
 	$(CC) -o bin/$@ $^
 
-test_vector: obj/test.o obj/data_structures/set_vector.o
-	$(CC) -o bin/$@ $^
-
-test_stlset: obj/test.o obj/data_structures/set_stl.o
+test_dheap: obj/test.o obj/data_structures/heap_dynamic.o
 	$(CC) -o bin/$@ $^
 
 obj/%.o: src/%.c
