@@ -38,5 +38,8 @@ int get_i(FSM f);
  */
 int get_succ(FSM f, int s, int i);
 
+int get_nb_preds(FSM f, int s, int i);
+
+int get_pred(FSM f, int s, int i, int pred_index);
 
 #endif

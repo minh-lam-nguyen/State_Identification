@@ -14,7 +14,6 @@ struct mergseq_ {
     triple * triples;   
 };
 
-
 // compute min merging seq for (s1,s2), with s1 <= s2
 // return length of merging seq for (s1, s2), -1 if no merging (or error)
 int mergSeq(FSM fsm, int s1, int s2){
@@ -112,6 +111,53 @@ int cmpTriples(const void * a, const void * b){
 
 // compute merging seq for all couple of states and store it in ms
 void getMergSeq(FSM fsm, MergSeq mergs){
+    int** ms = mergs->ms;
+    int s = get_s(fsm);
+
+    int* queue = (int*) malloc(sizeof(int*) * s * s * 2);
+    int qIndex = 0;
+    int qSize = 0;
+
+    // Init merging sequences
+    for(int i = 0; i < get_s(fsm) - 1; i++){
+        ms[i][i] = 0;
+        queue[2 * qSize] = i;
+        queue[2 * qSize + 1] = i;
+        qSize++;
+        for(int j = i + 1; j < get_s(fsm); j++)
+            ms[i][j] = -1;
+    }
+
+    while(qIndex != qSize){
+        int u = queue[2 * qIndex];
+        int v = queue[2 * qIndex + 1];
+        qIndex++;
+
+        for(int input = 0; input < get_i(fsm); input++){
+            int nbUPred = get_nb_preds(fsm, u, input);
+            int nbVPred = get_nb_preds(fsm, v, input);
+            for(int pui = 0; pui < nbUPred; pui++){
+                int pu = get_pred(fsm, u, input, pui);
+                for(int pvi = 0; pvi < nbVPred; pvi++){
+                    int pv = get_pred(fsm, v, input, pvi);
+                    int ppu = pu;
+                    int ppv = pv;
+                    if(ppu > ppv){ // Swap
+                        ppu = ppu + ppv
+                        ppv = ppu - ppv;
+                        ppu = ppu - ppv;
+                    }
+                    if(ms[ppu][ppv] != -1)
+                        continue;
+                    ms[ppu][ppv] = ms[u][v] + 1;
+                    queue[2 * qSize] = ppu;
+                    queue[2 * qSize + 1] = ppv;
+                }
+            }
+        }
+    }
+
+    free(queue);
 
     int count = 0;
     for (int i=0; i<get_s(fsm)-1; i++){
@@ -124,7 +170,7 @@ void getMergSeq(FSM fsm, MergSeq mergs){
             mergs->ms[i][j] = ms;
             mergs->triples[count].a = i;
             mergs->triples[count].b = j;
-            mergs->triples[count].c = ms;
+            mergs->triples[count].c = ms[i][j];
             count++;
         }
     }
