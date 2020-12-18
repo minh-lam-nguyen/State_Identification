@@ -49,6 +49,9 @@ Set initSet(int size, int offset){
  */
 void freeSet(Set s){
     // Libérer les pointeurs
+    for(int i=0; i<HASH_SIZE; i++)
+        for(int j=0; j<s->c[i]; j++)
+            free(s->s[i][j]);
     free(s); // On ne libère pas les éléments de s->s car ils ont été créé ailleurs et seront libérés ailleurs.
 }
 

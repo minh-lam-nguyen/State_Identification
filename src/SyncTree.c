@@ -8,8 +8,10 @@
 #include "data_structures/fsm.h"
 #include "data_structures/mergseq.h"
 
+
 #define SIZE 150 // res
 #define SIZE_Q 100000000
+#define DELIM_MS 7
 
 
 // free queue and visited
@@ -32,7 +34,7 @@ int syncTree(FSM fsm, int* res) {
 	int back_q = 1;
 
 	// visited set of states
-    Set visited = initSet(get_s(fsm));
+    Set visited = initSet(get_s(fsm), 0);
 
 	if (!(queue))
 		return -1;
@@ -64,19 +66,19 @@ int syncTree(FSM fsm, int* res) {
                 // size of current seq
 		int seq_size = states[get_s(fsm)];
                     
-                int k, tmp_cpt = 0;
-                for(k=0; k<get_s(fsm); k++)
-                    if (states[k] == 1)
-                        tmp_cpt++;
+        int k, tmp_cpt = 0;
+        for(k=0; k<get_s(fsm); k++)
+            if (states[k] == 1)
+                tmp_cpt++;
 
-                // if singleton (1 and only one state) : SS
-                if (tmp_cpt==1) {
-                    for(k=0; k<seq_size ;k++)
-                        res[k] = states[k+get_s(fsm)+1];
-                    clear_Q(queue, back_q);
-                    freeSet(visited);
-                    return seq_size;
-                }
+        // if singleton (1 and only one state) : SS
+        if (tmp_cpt==1) {
+            for(k=0; k<seq_size ;k++)
+                res[k] = states[k+get_s(fsm)+1];
+            clear_Q(queue, back_q);
+            freeSet(visited);
+            return seq_size;
+        }
 
 
 		//printf("current: %d / ttl_q: %d \n", current, current + count_q+1);
@@ -147,7 +149,7 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
 
 	std::priority_queue<int*, std::vector<int*>, CompareQ> queue;
 	// visited set of states
-   	Set visited = initSet(get_s(fsm));
+   	Set visited = initSet(get_s(fsm), 0);
 
 	// add set of all state (init) on queue
 	int* initS = (int*)malloc( (SIZE + 2 + get_s(fsm)) * sizeof(int) );
@@ -163,6 +165,9 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
             
 	queue.push(initS);
 		
+	//int cpt_lin = 0;
+    //int cpt_sort = 0;
+
 	while (!queue.empty()) {
 
 		//printf("size: %ld\n", queue.size());
@@ -202,6 +207,7 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
                 res[k] = tmp[k+get_s(fsm)+2];
             clear_priorityQ(queue);
             freeSet(visited);
+            //printf("linear: %d \nsorted: %d\n", cpt_lin, cpt_sort);
             return seq_size;
         }
 		
@@ -209,8 +215,6 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
 		int added = add(visited, states);
 		//printf("added: %d\n", added);
         if(added == 0) {
-            //free(queue.top());
-			//queue.pop();
 			free(tmp);
 			continue;
         }
@@ -218,7 +222,6 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
             printf("ERREUR CAPACITE ATTEINTE\n");
             break;
         }
-               
 
 		// c0 and c1 successors of current
 		int *c0 = (int*)malloc( (get_s(fsm)) * sizeof(int) );
@@ -230,10 +233,24 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
             c1[j] = 0;
 		}
 
+		int size_c0=0;
+		int size_c1=0;
+
 		for (j=0; j<get_s(fsm); j++) {
             if (states[j]) {
-                c0[ get_succ(fsm, j, 0) ] = 1;
-                c1[ get_succ(fsm, j, 1) ] = 1;
+            	
+            	if (c0[ get_succ(fsm, j, 0) ] == 0 ){
+            		c0[ get_succ(fsm, j, 0) ] = 1;
+            		size_c0++;
+            	} 
+            	if (c1[ get_succ(fsm, j, 1) ] == 0 ){
+            		c1[ get_succ(fsm, j, 1) ] = 1;
+            		size_c1++;
+            	} 
+            	
+        		//c0[ get_succ(fsm, j, 0) ] = 1;
+        		//c1[ get_succ(fsm, j, 1) ] = 1;
+
             }
 		}
 
@@ -245,6 +262,8 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
 		*/
 
         int* succs[2] = {c0, c1};
+        int size_succs[2] = {size_c0, size_c1};
+        
                 
         for(int symbol = 0; symbol < 2; symbol++){
             int* successor = succs[symbol];
@@ -254,10 +273,21 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
             if(inVisited == 1)
                 continue;
 	
-            //printf("addQ: ");
 
             int* addQ = (int*)malloc( (SIZE + 2 + get_s(fsm)) * sizeof(int) );
-            addQ[0] = tmp[get_s(fsm) + 1] + maxMSSorted(mergs, get_s(fsm), successor);
+            
+            if (size_succs[symbol] < DELIM_MS){
+            	addQ[0] = tmp[get_s(fsm) + 1] + maxMSLinear(mergs, get_s(fsm), successor);
+            	//cpt_lin++;
+            }
+            else{
+	            addQ[0] = tmp[get_s(fsm) + 1] + maxMSSorted(mergs, get_s(fsm), successor);
+	            //cpt_sort++;
+            }
+            
+            //printf("addQ: ");
+        	//addQ[0] = tmp[get_s(fsm) + 1] + maxMSSorted(mergs, get_s(fsm), successor);
+
             //printf("%d ", addQ[0]);
             for (k=0; k<get_s(fsm); k++){
             	addQ[k+1] = successor[k];
@@ -282,8 +312,6 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
 		free(c0);
 		free(c1);
 		
-		//free(queue.top());
-		//queue.pop();
 		free(tmp);
 		//printf("size: %ld\n",queue.size());	
 	}
@@ -332,28 +360,17 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
         // if singleton (1 and only one state) : SS
         if (tmp_cpt==1) {
             clear_priorityQ(queue);
-            freeSet(visited);
+            freeSet(storage);
             return seq_size;
         }
         
         // if couple (2 states) : SS = current + MS
         if (tmp_cpt==2) {
             clear_priorityQ(queue);
-            freeSet(visited);
+            freeSet(storage);
             return states[0];
         }
-    
-        /*
-        int added = add(visited, states);
-        if(added == 0) {
-            free(states);
-            continue;
-        }
-        if(added == -1){
-            printf("ERREUR CAPACITE ATTEINTE\n");
-            break;
-        }
-        */     
+     
 
         // c0 and c1 successors of current
         int *c0 = (int*)malloc((2 + get_s(fsm)) * sizeof(int) );
@@ -376,7 +393,7 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
                 
         for(int symbol = 0; symbol < 2; symbol++){
             int* successor = succs[symbol];
-            int* succInVisited = addOrReturn(visited, successor);
+            int* succInVisited = addOrReturn(storage, successor);
 
             if(succInVisited == successor){
                 successor[0] = seq_size + 1 + maxMSSorted(mergs, get_s(fsm), successor + 1);
@@ -398,6 +415,7 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
     return -1;
 }
 
+
 int test_time() {
 
 	int i;
@@ -406,10 +424,12 @@ int test_time() {
 
 	clock_t beg = clock();
 
+	int noMS= 0;
+
 	for (i=1; i<=50; i++) {
 		    	
 
-        char tmp[SIZE] = "./data/SS_50fsm_n50/fsm_n50_";
+        char tmp[SIZE] = "./data/SS_50fsm_n30/fsm_n30_";
 		char numb[10];
         sprintf(numb, "%d", i);
         strcat(tmp, numb);
@@ -425,6 +445,12 @@ int test_time() {
 		int res[SIZE];
 
 		MergSeq mergs = initMS(fsm);
+
+		if (mergs == NULL){
+			noMS++;
+			printf("dfa %d: no SS\n\n", i);
+			continue;
+		}
 
 		//time_t begin = time(NULL);
 		clock_t b = clock();
@@ -463,6 +489,9 @@ int test_time() {
 	clock_t end = clock();
 	double total = (double)(end-beg)* 1000 / CLOCKS_PER_SEC;
 	ttl = ttl *1000 / CLOCKS_PER_SEC;
+
+	i -= noMS;
+
 	printf("total time: %f ms / average: %f ms (%d fsm)\n", total, total/(i-1), i-1);
 	printf("time without MS time:\ntotal time: %f ms / average: %f ms (%d fsm)\n", ttl, ttl/(i-1), i-1);
 
@@ -521,9 +550,9 @@ int test_allms() {
 
 int main() {
 
-	//test_time();
+	test_time();
 	
-	test_best();
+	//test_best();
 	//test_allms();
 
 	return 0;

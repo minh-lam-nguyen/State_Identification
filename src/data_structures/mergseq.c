@@ -33,7 +33,7 @@ int mergSeq(FSM fsm, int s1, int s2){
 	queue[0][2] = 0;
 
 	// elem of visited: ( state1, state2 )
-	Set visited = initSet(2);
+	Set visited = initSet(2, 0);
 
 	while (front_q != back_q) {
 
@@ -117,6 +117,10 @@ void getMergSeq(FSM fsm, MergSeq mergs){
     for (int i=0; i<get_s(fsm)-1; i++){
         for (int j=i+1; j<get_s(fsm); j++){
             int ms = mergSeq(fsm, i, j);
+            if (ms == -1){
+                mergs->ms = NULL;
+                return;
+            }
             mergs->ms[i][j] = ms;
             mergs->triples[count].a = i;
             mergs->triples[count].b = j;
@@ -141,7 +145,10 @@ MergSeq initMS(FSM fsm){
 
     getMergSeq(fsm, mergs);
 
-    return mergs;
+    if (mergs->ms == NULL)
+        return NULL;
+    else
+        return mergs;
 }
 
 
@@ -149,7 +156,7 @@ void freeMS(MergSeq mergs, int size){
 	for(int i=0; i<size; i++)
 		free(mergs->ms[i]);
 	free(mergs->ms);
-        free(mergs->triples);
+    free(mergs->triples);
 }
 
 

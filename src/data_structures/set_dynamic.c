@@ -11,21 +11,22 @@ struct s_set{
     int** s; // Tableau contenant HASH_SIZE listes d'int*
     int* c; // Nombre déléments avec chaque hash dans le set
     int size; // Nombre minimum d'entiers dans les int* ajoutés dans le set
+    int offset;
 };
 
 /**
  * Renvoie le Hash de l'élément e, sachant qu'il est de taille s
  */
-unsigned int hash(Set s, int* e, int size) {
+unsigned int hash(Set s, int* e) {
     unsigned int res = 0;
-    for(int i = 0; i < size; i++) {
+    for(int i = s->offset; i < s->offset + s->size; i++) {
         res = (res + i) * 1997 + e[i];
     }
     return res % (s->max_hash);
 }
 
-int equals(int* e, int* f, int size){
-    for(int i = 0; i < size; i++){
+int equals(Set s, int* e, int* f){
+    for(int i = s->offset; i < s->offset + s->size ; i++){
         if(e[i] != f[i])
             return 0;
     }
@@ -35,7 +36,7 @@ int equals(int* e, int* f, int size){
 /**
  * Initialisation du Set
  */
-Set initSet(int size){
+Set initSet(int size, int offset){
     Set s = (Set) malloc(sizeof(struct s_set));
     s->current_hash_index = -1;
     s->s = (int**) malloc(sizeof(int*) * HASH_SIZE * SIZE_V);
@@ -46,6 +47,7 @@ Set initSet(int size){
     }
     
     s->size = size;
+    s->offset = offset;
     s->max_hash = HASH_SIZE;
     return s;
 }
@@ -79,7 +81,7 @@ int double_size(Set s){
     for(int i = 0; i < prev_hash; i++){
         for(int j = 0; j < s->c[i]; j++){
             int* e = s->s[i * SIZE_V + j];
-            int h = hash(s, e, s->size);
+            int h = hash(s, e);
             int c = double_c[h];
             double_s[h * SIZE_V  + c] = e;
             double_c[h]++;
@@ -100,10 +102,10 @@ int double_size(Set s){
  */
 int add(Set s, int* e){
     while(1){
-        int h = hash(s, e, s->size);
+        int h = hash(s, e);
         int c = s->c[h];
         for(int i = 0; i < c; i++)
-            if(equals(e, s->s[h * SIZE_V + i], s->size))
+            if(equals(s, e, s->s[h * SIZE_V + i]))
                 return 0;
 
         if(c == SIZE_V){
@@ -126,11 +128,17 @@ int add(Set s, int* e){
  * e doit être un pointeur sur au moins size entiers
  */
 int find(Set s, int* e){
-    int h = hash(s, e, s->size);
+    int h = hash(s, e);
     int c = s->c[h];
     for(int i = 0; i < c; i++){
-        if(equals(e, s->s[h * SIZE_V + i], s->size))
+        if(equals(s, e, s->s[h * SIZE_V + i]))
             return 1;
     }
     return 0;
+}
+
+
+
+int* addOrReturn(Set s, int* e){
+    return e;
 }
