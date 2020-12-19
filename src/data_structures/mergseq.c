@@ -143,7 +143,7 @@ void getMergSeq(FSM fsm, MergSeq mergs){
                     int ppu = pu;
                     int ppv = pv;
                     if(ppu > ppv){ // Swap
-                        ppu = ppu + ppv
+                        ppu = ppu + ppv;
                         ppv = ppu - ppv;
                         ppu = ppu - ppv;
                     }
@@ -170,7 +170,7 @@ void getMergSeq(FSM fsm, MergSeq mergs){
             mergs->ms[i][j] = ms;
             mergs->triples[count].a = i;
             mergs->triples[count].b = j;
-            mergs->triples[count].c = ms[i][j];
+            mergs->triples[count].c = ms;
             count++;
         }
     }
