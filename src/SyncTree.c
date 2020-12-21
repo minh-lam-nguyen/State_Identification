@@ -386,10 +386,10 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
             //return states[0];
             return res;
         }
-     
+
         // c0 and c1 successors of current
-        int *c0 = (int*)malloc((2 + get_s(fsm)) * sizeof(int) );
-        int *c1 = (int*)malloc((2 + get_s(fsm)) * sizeof(int) );
+        int *c0 = (int*)malloc((3 + get_s(fsm)) * sizeof(int) );
+        int *c1 = (int*)malloc((3 + get_s(fsm)) * sizeof(int) );
         
         int j;
         for (j=0; j < get_s(fsm); j++) {
@@ -405,7 +405,7 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
         }
 
         int* succs[2] = {c0, c1};
-                
+
         for(int symbol = 0; symbol < 2; symbol++){
             int* successor = succs[symbol];
             int* succInVisited = addOrReturn(storage, successor);
@@ -422,7 +422,7 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
                 //printf("old, new: %d %d\n", seq_size, seq_size_n);
                 if(seq_size + 1 < seq_size_n){
                     // UPDATE DANS QUEUE !!!
-                    decreaseKey(queue, succInVisited, seq_size_n - (seq_size + 1));
+                    decreaseKey(queue, succInVisited, seq_size_n);
                     succInVisited[0] -= seq_size_n - (seq_size + 1);
                     succInVisited[get_s(fsm) + 1] -= seq_size_n - (seq_size + 1);
                 }
@@ -450,7 +450,7 @@ int test_time() {
 	for (i=1; i<=50; i++) {
 		    	
 		
-        char tmp[SIZE] = "./data/SS_50fsm_n70/fsm";
+        char tmp[SIZE] = "./data/SS_50fsm_n50/fsm_n50_";
 		char numb[10];
         sprintf(numb, "%d", i);
         strcat(tmp, numb);
