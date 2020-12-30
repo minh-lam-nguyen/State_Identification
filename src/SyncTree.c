@@ -5,8 +5,12 @@
 #include <time.h>
 #include <queue>
 #include "data_structures/set.h"
+#include "data_structures/set_inc.h"
 #include "data_structures/fsm.h"
 #include "data_structures/mergseq.h"
+#include "data_structures/tergseq.h"
+#include "data_structures/quadseq.h"
+#include "data_structures/shp.h"
 #include "data_structures/heap.h"
 
 
@@ -148,7 +152,7 @@ void clear_priorityQ(std::priority_queue<int*, std::vector<int*>, CompareQ> queu
 }
 
 // best Sync tree
-int bestSearch(FSM fsm, int *res, MergSeq mergs){
+int bestSearch(FSM fsm, MergSeq mergs){
 
 	std::priority_queue<int*, std::vector<int*>, CompareQ> queue;
 
@@ -207,8 +211,6 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
 
         // if singleton (1 and only one state) : SS
         if (tmp_cpt==1) {
-            for(k=0; k<seq_size ;k++)
-                res[k] = tmp[k+get_s(fsm)+2];
             clear_priorityQ(queue);
             freeSet(visited);
             //printf("linear: %d \nsorted: %d\n", cpt_lin, cpt_sort);
@@ -325,7 +327,7 @@ int bestSearch(FSM fsm, int *res, MergSeq mergs){
 
 
 // best Sync tree with heap and storage
-int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
+int bestSearchUnique(FSM fsm, MergSeq mergs){
 
     Heap queue = initHeap(0, get_s(fsm)+2);
 
@@ -345,8 +347,9 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
 
     insertToHeap(queue, initS);
 
+    int nbExplore = 0;
     while (sizeOfHeap(queue) > 0) {
-
+        nbExplore++;
         int* states = popMinimum(queue);
 
         /*
@@ -373,6 +376,7 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
 
         // if singleton (1 and only one state) : SS
         if (tmp_cpt==1) {
+            printf(">> %d |", nbExplore);
             freeHeap(queue);
             freeSet(storage);
             return seq_size;
@@ -380,6 +384,7 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
         
         // if couple (2 states) : SS = current + MS
         if (tmp_cpt==2) {
+            printf(">> %d |", nbExplore);
         	int res = states[0];
             freeHeap(queue);
             freeSet(storage);
@@ -422,8 +427,7 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
                 //printf("old, new: %d %d\n", seq_size, seq_size_n);
                 if(seq_size + 1 < seq_size_n){
                     // UPDATE DANS QUEUE !!!
-                    decreaseKey(queue, succInVisited, seq_size_n);
-                    succInVisited[0] -= seq_size_n - (seq_size + 1);
+                    decreaseKey(queue, succInVisited, succInVisited[0] - seq_size_n + (seq_size + 1));
                     succInVisited[get_s(fsm) + 1] -= seq_size_n - (seq_size + 1);
                 }
                 //free(successor);
@@ -437,135 +441,500 @@ int bestSearchUnique(FSM fsm, int *res, MergSeq mergs){
 }
 
 
+// best Sync tree with heap and storage and MS of triplets
+int bestSearchUniqueQ(FSM fsm, QuadSeq quads){
+
+    Heap queue = initHeap(0, get_s(fsm)+2);
+
+    // visited set of states
+    Set storage = initSet(get_s(fsm), 1);
+
+    // add set of all state (init) on queue
+    int* initS = (int*)malloc( (3 + get_s(fsm)) * sizeof(int) );
+
+    initS[0] = 0;
+    int j;
+
+    for(j=1; j<get_s(fsm)+1; j++)
+        initS[j] = 1;
+
+    initS[get_s(fsm)+1] =0;
+
+    insertToHeap(queue, initS);
+
+    int nbExplore = 0;
+    while (sizeOfHeap(queue) > 0) {
+        nbExplore++;
+        int* states = popMinimum(queue);
+
+        /*
+        printf("\nstates: %d ", states[0]);
+        for (int ttt = 1; ttt<get_s(fsm)+1; ttt++){
+        	printf("%d ", states[ttt]);
+        }
+        printf("\n");
+        printf("size: %d\n", states[get_s(fsm) +1]);
+		*/
+
+        // size of current seq
+        int seq_size = states[get_s(fsm)+1];
+		
+        int k, tmp_cpt = 0;
+        for(k=0; k<get_s(fsm); k++){
+            if (states[k + 1] == 1)
+                tmp_cpt++;
+            if (tmp_cpt == 4)
+                break;
+        }
+
+        //printf("%d\n", tmp_cpt);
+
+        // if singleton (1 and only one state) : SS
+        if (tmp_cpt==1) {
+            printf(">> %d |", nbExplore);
+            freeHeap(queue);
+            freeSet(storage);
+            return seq_size;
+        }
+        
+        // if couple or triple (2 or 3 states) : SS = current + MS
+        if (tmp_cpt <= 3) {
+            printf(">> %d |", nbExplore);
+            int res = states[0];
+            freeHeap(queue);
+            freeSet(storage);
+            //return states[0];
+            return res;
+        }
+
+        // c0 and c1 successors of current
+        int *c0 = (int*)malloc((3 + get_s(fsm)) * sizeof(int) );
+        int *c1 = (int*)malloc((3 + get_s(fsm)) * sizeof(int) );
+        
+        int j;
+        for (j=0; j < get_s(fsm); j++) {
+            c0[j + 1] = 0;
+            c1[j + 1] = 0;
+        }
+
+        for (j=0; j< get_s(fsm); j++) {
+            if (states[j + 1]) {
+                c0[ get_succ(fsm, j, 0) + 1] = 1;
+                c1[ get_succ(fsm, j, 1) + 1] = 1;
+            }
+        }
+
+        int* succs[2] = {c0, c1};
+
+        for(int symbol = 0; symbol < 2; symbol++){
+            int* successor = succs[symbol];
+            int* succInVisited = addOrReturn(storage, successor);
+
+            if(succInVisited == successor){
+                successor[0] = seq_size + 1 + maxQSSorted(quads, get_s(fsm), successor + 1);
+                //printf("key succ: %d\n", successor[0]);
+                successor[get_s(fsm) + 1] = seq_size + 1;
+                //printf("size succ: %d\n", successor[get_s(fsm) + 1]);
+                insertToHeap(queue, successor);
+            }
+            else{
+                int seq_size_n = succInVisited[get_s(fsm) + 1];
+                //printf("old, new: %d %d\n", seq_size, seq_size_n);
+                if(seq_size + 1 < seq_size_n){
+                    // UPDATE DANS QUEUE !!!
+                    decreaseKey(queue, succInVisited, succInVisited[0] - seq_size_n + (seq_size + 1));
+                    succInVisited[get_s(fsm) + 1] -= seq_size_n - (seq_size + 1);
+                }
+                //free(successor);
+            }
+            
+        }
+
+    }
+
+    return -1;
+}
+
+
+// best Sync tree with heap and storage and MS of triplets
+int bestSearchUniqueT(FSM fsm, TergSeq tergs){
+
+    Heap queue = initHeap(0, get_s(fsm)+2);
+
+    // visited set of states
+    Set storage = initSet(get_s(fsm), 1);
+
+    // add set of all state (init) on queue
+    int* initS = (int*)malloc( (3 + get_s(fsm)) * sizeof(int) );
+
+    initS[0] = 0;
+    int j;
+
+    for(j=1; j<get_s(fsm)+1; j++)
+        initS[j] = 1;
+
+    initS[get_s(fsm)+1] =0;
+
+    insertToHeap(queue, initS);
+
+    int nbExplore = 0;
+    while (sizeOfHeap(queue) > 0) {
+        nbExplore++;
+        int* states = popMinimum(queue);
+
+        /*
+        printf("\nstates: %d ", states[0]);
+        for (int ttt = 1; ttt<get_s(fsm)+1; ttt++){
+        	printf("%d ", states[ttt]);
+        }
+        printf("\n");
+        printf("size: %d\n", states[get_s(fsm) +1]);
+		*/
+
+        // size of current seq
+        int seq_size = states[get_s(fsm)+1];
+		
+        int k, tmp_cpt = 0;
+        for(k=0; k<get_s(fsm); k++){
+            if (states[k + 1] == 1)
+                tmp_cpt++;
+            if (tmp_cpt == 4)
+                break;
+        }
+
+        //printf("%d\n", tmp_cpt);
+
+        // if singleton (1 and only one state) : SS
+        if (tmp_cpt==1) {
+            printf(">> %d |", nbExplore);
+            freeHeap(queue);
+            freeSet(storage);
+            return seq_size;
+        }
+        
+        // if couple or triple (2 or 3 states) : SS = current + MS
+        if (tmp_cpt <= 3) {
+            printf(">> %d |", nbExplore);
+            int res = states[0];
+            freeHeap(queue);
+            freeSet(storage);
+            //return states[0];
+            return res;
+        }
+
+        // c0 and c1 successors of current
+        int *c0 = (int*)malloc((3 + get_s(fsm)) * sizeof(int) );
+        int *c1 = (int*)malloc((3 + get_s(fsm)) * sizeof(int) );
+        
+        int j;
+        for (j=0; j < get_s(fsm); j++) {
+            c0[j + 1] = 0;
+            c1[j + 1] = 0;
+        }
+
+        for (j=0; j< get_s(fsm); j++) {
+            if (states[j + 1]) {
+                c0[ get_succ(fsm, j, 0) + 1] = 1;
+                c1[ get_succ(fsm, j, 1) + 1] = 1;
+            }
+        }
+
+        int* succs[2] = {c0, c1};
+
+        for(int symbol = 0; symbol < 2; symbol++){
+            int* successor = succs[symbol];
+            int* succInVisited = addOrReturn(storage, successor);
+
+            if(succInVisited == successor){
+                successor[0] = seq_size + 1 + maxTSSorted(tergs, get_s(fsm), successor + 1);
+                //printf("key succ: %d\n", successor[0]);
+                successor[get_s(fsm) + 1] = seq_size + 1;
+                //printf("size succ: %d\n", successor[get_s(fsm) + 1]);
+                insertToHeap(queue, successor);
+            }
+            else{
+                int seq_size_n = succInVisited[get_s(fsm) + 1];
+                //printf("old, new: %d %d\n", seq_size, seq_size_n);
+                if(seq_size + 1 < seq_size_n){
+                    // UPDATE DANS QUEUE !!!
+                    decreaseKey(queue, succInVisited, succInVisited[0] - seq_size_n + (seq_size + 1));
+                    succInVisited[get_s(fsm) + 1] -= seq_size_n - (seq_size + 1);
+                }
+                //free(successor);
+            }
+            
+        }
+
+    }
+
+    return -1;
+}
+
+
+// backward best Sync tree with heap and storage
+int bwBestSearchUnique(FSM fsm, Shp shps){
+
+    int size = get_s(fsm);
+    Heap queue = initHeap(0, size+2);
+
+    // visited set of states
+    SetInc storage = initSetInc(size, 1);
+
+    // add set of singletons on queue
+
+    for(int i = 0; i < size; i++){
+        int* initS = (int*)malloc( (3 + size) * sizeof(int) );
+        for(int j=1; j<size + 1; j++)
+            initS[j] = (j - 1 == i) ? 1 : 0;
+        int b = maxShpSorted(shps, size, initS + 1);
+        initS[size + 2] = -1;
+        if(b == -1){
+            free(initS);
+            continue;
+        }
+
+        initS[size + 1] = 0;
+        initS[0] = b;
+        insertToHeap(queue, initS);
+        addInc(storage, initS);
+    }
+
+    int nbExplore = 0;
+    while (sizeOfHeap(queue) > 0) {
+        nbExplore++;
+        int* states = popMinimum(queue);
+
+        // size of current seq
+        int seq_size = states[get_s(fsm)+1];
+		
+        int tmp_cpt = 1;
+        for(int k=0; k<get_s(fsm); k++){
+            if (states[k + 1] == 1)
+                continue;
+            tmp_cpt = 0;
+            break;
+        }
+
+        // if tmp_cpt is 1, states contain all states
+        if (tmp_cpt==1) {
+            //printf(">> %d |", nbExplore);
+            freeHeap(queue);
+            freeSetInc(storage);
+            return seq_size;
+        }
+        
+        // c0 and c1 preimages of current
+        int *c0 = (int*)malloc((3 + size) * sizeof(int) );
+        int *c1 = (int*)malloc((3 + size) * sizeof(int) );
+        
+        for (int j=0; j < size; j++) {
+                int s0 = get_succ(fsm, j, 0);
+                int s1 = get_succ(fsm, j, 1);
+                
+                c0[j + 1] = states[s0 + 1];
+                c1[j + 1] = states[s1 + 1];
+        }
+        /*c0[0] = 0;
+        c1[0] = 0;
+        c0[size + 1] = 0;
+        c1[size + 1] = 0;
+        c0[size + 2] = 0;
+        c1[size + 2] = 0;
+        */
+
+        int* preds[2] = {c0, c1};
+
+        for(int symbol = 0; symbol < 2; symbol++){
+            int* predecessor = preds[symbol];
+            int b = maxShpSorted(shps, size, predecessor + 1);
+        
+            if(b == -1)
+                continue;
+
+            int* predInVisited = addIncOrReturn(storage, predecessor);
+            if(predInVisited == predecessor){
+                predecessor[0] = seq_size + 1 + b;
+                predecessor[size + 1] = seq_size + 1;
+                predecessor[size + 2] = -1;
+                insertToHeap(queue, predecessor);
+            }
+            else{
+                int seq_size_n = predInVisited[size + 1];
+                if(seq_size + 1 < seq_size_n){
+                    // UPDATE DANS QUEUE !!!
+                    decreaseKey(queue, predInVisited, predInVisited[0] - (seq_size_n - (seq_size + 1)));
+                    predInVisited[size + 1] -= seq_size_n - (seq_size + 1);
+                }
+                
+                free(predecessor);
+            }
+            
+        }
+
+    }
+
+    return -1;
+}
+
+
 int test_time() {
 
 	int i;
-	//float total = 0;
-	double ttl = 0;
 
-	clock_t beg = clock();
+        // Indique quels algos sont testés
+        // Si 1, l'algo est testé sinon il ne l'est pas.
+        // 0 : bestSearch, avec set visited, borne MS
+        // 1 : bestSearchUnique, avec dict storage, borne MS
+        // 2 : bestSearchUniqueT, avec dict storage, borne TS
+        // 3 : bwBestSearchUnique, avec dict storage, borne TS
+        int algs[] = {0, 1, 1, 1, 0};
 
+	clock_t begPrecomputing, endPrecomputing, b, e;
 	int noMS= 0;
+        double precTimes[4];
+        double times[4];
 
-	for (i=1; i<=50; i++) {
-		    	
-		
-        char tmp[SIZE] = "./data/SS_50fsm_n50/fsm_n50_";
-		char numb[10];
-        sprintf(numb, "%d", i);
-        strcat(tmp, numb);
-		strcat( tmp, ".fsm" );
-		
-	    
-        //const char tmp[SIZE] = "./data/fsm_hss.fsm";
-        //const char tmp[SIZE] = "./data/SS_50fsm_n50/fsm_n50_18.fsm";
-        //printf("%s\n", tmp );
+        for(int algIndex = 0; algIndex < 4; algIndex++){
+            if(algs[algIndex] == 0)
+                continue;
 
-		FSM fsm = initFSM(tmp);
-		//printFSM(fsm);
+            for (i=3; i<=50; i++) {
+                                    
+                begPrecomputing = clock();
+                char tmp[SIZE] = "./data/SS_50fsm_n70/fsm";
+                //char tmp[SIZE] = "./data/fsm_n20_";
+                char numb[10];
+                sprintf(numb, "%d", i);
+                strcat(tmp, numb);
+                strcat( tmp, ".fsm" );
+
+                FSM fsm = initFSM(tmp);
+                //printFSM(fsm);
+
+                TergSeq tergs;
+                MergSeq mergs;
+                QuadSeq quads;
+                Shp shps;
+
+                switch(algIndex){
+                    case 0:
+                    case 1:
+                        mergs = initMS(fsm);
+                        if (mergs == NULL){
+                                noMS++;
+                                printf("%d X ", i);
+                                continue;
+                        }
+                        break;
+                    case 2:
+                        tergs = initTS(fsm);
+
+                        if (tergs == NULL){
+                                noMS++;
+                                printf("%d X ", i);
+                                continue;
+                        }
+                        break;
+                    case 3:
+                        quads = initQS(fsm);
+
+                        if (quads == NULL){
+                                noMS++;
+                                printf("%d X ", i);
+                                continue;
+                        }
+                        break;
+                    case 4:
+                        mergs = initMS(fsm);
+                        shps = initSHP(fsm);
+
+                        if (mergs == NULL){
+                                noMS++;
+                                printf("%d X ", i);
+                                continue;
+                        }
+                        break;
+                }
+
+                endPrecomputing = clock();
+                precTimes[algIndex] += (double)(endPrecomputing - begPrecomputing);
 
 
-		int res[SIZE];
+                int taille;
+                b = clock();
+                switch(algIndex){
+                    case 0:
+                        taille = bestSearch(fsm, mergs);
+                        break;
+                    case 1:
+                        taille = bestSearchUnique(fsm, mergs);
+                        break;
+                    case 2:
+                        taille = bestSearchUniqueT(fsm, tergs);
+                        break;
+                    case 3:
+                        taille = bestSearchUniqueQ(fsm, quads);
+                        break;
+                    case 4:
+                        taille = bwBestSearchUnique(fsm, shps);
+                        break;
+                }
 
-		MergSeq mergs = initMS(fsm);
+                e = clock();
+                times[algIndex] += (double)(e-b);
 
-		if (mergs == NULL){
-			noMS++;
-			printf("dfa %d: no SS\n\n", i);
-			continue;
-		}
+                printf("%d ", i);
 
-		//time_t begin = time(NULL);
-		clock_t b = clock();
+                printf("%d | ", taille);
+                //printf( "dfa %d: length SS: %d \t time: %f ms\n\n", i, taille, (double)(e-b) * 1000 / CLOCKS_PER_SEC);
+                
+                switch(algIndex){
+                    case 0:
+                    case 1:
+                        freeMS(mergs, get_s(fsm));
+                        break;
+                    case 2:
+                        freeTS(tergs, get_s(fsm));
+                        break;
+                    case 3:
+                        freeQS(quads, get_s(fsm));
+                        break;
+                    case 4:
+                        freeMS(mergs, get_s(fsm));
+                        freeSHP(shps, get_s(fsm));
+                        break;
+                }
+                
+                freeFSM(fsm);
 
-		//int taille = syncTree(fsm, res);
-		//int taille = bestSearch(fsm, res, mergs);
-		int taille = bestSearchUnique(fsm, res, mergs);
+            }
+            printf("\n");
+            i -= noMS;
+            double total = (precTimes[algIndex] + times[algIndex]) * 1000 / CLOCKS_PER_SEC;
+            double time = times[algIndex] * 1000 / CLOCKS_PER_SEC;
+            printf("total time: %f ms / average: %f ms (%d fsm)\n", total, total/(i-1), i-1);
+            printf("time without MS time:\ntotal time: %f ms / average: %f ms (%d fsm)\n", time, time / (i-1), i-1);
+        }
 
-		//time_t end = time(NULL);
-		clock_t e = clock();
-
-		//total += difftime(end,begin);
-		ttl += (double)(e-b);
-
-		//printf("dfa %d: length SS: %d time: %f s / %f ms\n", i, taille, difftime(end, begin), (double)(e-b));
-		printf( "dfa %d: length SS: %d \t time: %f ms\n\n", i, taille, (double)(e-b) * 1000 / CLOCKS_PER_SEC);
-		//printf( "dfa %d: length SS: %d\n", i, taille );
-		
-
-		freeMS(mergs, get_s(fsm));
-
-		//int j;
-		//printf("SS: ");
-		//for (j=0; j<taille; j++){
-		//	printf("%d", res[j]);
-		//}
-		//printf("\n\n");
-		
-		freeFSM(fsm);
-
-	}
-
-	//printf("\ntotal time: %f ms / average (50 dfa): %f ms\n", ttl, ttl/(i-1));
-	//printf("total time: %f seconds / average (50 dfa): %f seconds\n", total, total/(i-1));
-
-	clock_t end = clock();
-	double total = (double)(end-beg)* 1000 / CLOCKS_PER_SEC;
-	ttl = ttl *1000 / CLOCKS_PER_SEC;
-
-	i -= noMS;
-
-	printf("total time: %f ms / average: %f ms (%d fsm)\n", total, total/(i-1), i-1);
-	printf("time without MS time:\ntotal time: %f ms / average: %f ms (%d fsm)\n", ttl, ttl/(i-1), i-1);
 
 	return 0;
 
 }
 
 // test bestSearch
-int test_best() {
+int test_bw() {
 
-	char tmp[SIZE] = "./data/fsm_n20_1.fsm";
-	//char tmp[SIZE] = "./data/fsm_hss.fsm";
-    printf( "%s\n", tmp );
-
-	FSM fsm = initFSM(tmp);
-	printFSM(fsm);
-
-
-	int res[SIZE];
-
-	MergSeq mergs = initMS(fsm);
-
-	printf("best: %d\n", bestSearch(fsm, res, mergs));
-
-	freeMS(mergs, get_s(fsm));
-	freeFSM(fsm);
-
-	return 0;
-}
-
-
-
-// test MergSeq and maxMS
-int test_allms() {
-
-        //char tmp[SIZE] = "./data/fsm_hss.fsm";
-	char tmp[SIZE] = "./data/fsm_n20_1.fsm";
-
-    printf( "%s\n", tmp );
+	char tmp[SIZE] = "./data/cerny_fsm/cerny_n5.fsm";
+        printf( "%s\n", tmp );
 
 	FSM fsm = initFSM(tmp);
 	printFSM(fsm);
 
-	MergSeq mergs = initMS(fsm);
+	Shp shps = initSHP(fsm);
 
-	int tmpS[20] = {0,1,0,1, 1};
-	//int tmpS[] = {0,1,1,1};
-	printf( "maxMS: %d\n", maxMSLinear(mergs, get_s(fsm), tmpS) );
-	printf( "maxMS: %d\n", maxMSSorted(mergs, get_s(fsm), tmpS) );
+	printf("best: %d\n", bwBestSearchUnique(fsm, shps));
 
-	freeMS(mergs, get_s(fsm));
+	freeSHP(shps, get_s(fsm));
 	freeFSM(fsm);
 
 	return 0;
@@ -573,10 +942,8 @@ int test_allms() {
 
 int main() {
 
-	test_time();
-	
-	//test_best();
-	//test_allms();
+        test_time();
+	//test_bw();
 
 	return 0;
 }

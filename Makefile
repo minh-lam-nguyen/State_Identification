@@ -1,8 +1,8 @@
-CC=g++ -g -Wall -Wextra
+CC=g++ -g -O3 -Wall -Wextra
 
 all: SyncTree_hashset
 
-SyncTree_hashset: obj/SyncTree.o obj/data_structures/set.o obj/data_structures/fsm.o obj/data_structures/mergseq.o obj/data_structures/heap.o
+SyncTree_hashset: obj/SyncTree.o obj/data_structures/set.o obj/data_structures/fsm.o obj/data_structures/mergseq.o obj/data_structures/tergseq.o  obj/data_structures/heap.o obj/data_structures/shp.o obj/data_structures/set_inc.o obj/data_structures/quadseq.o
 	$(CC) -o bin/$@ $^
 
 SyncTree_dhashset: obj/SyncTree.o obj/data_structures/set_dynamic.o obj/data_structures/fsm.o obj/data_structures/mergseq.o

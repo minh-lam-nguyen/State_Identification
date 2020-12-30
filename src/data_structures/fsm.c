@@ -37,8 +37,8 @@ FSM setFSM(int s, int i, int** trans) {
         for (j=0; j<s; j++){
             for(int k = 0; k < i; k++){
 	        int succ = f->succ[j][k] = trans[j][k];
-                f->predsSizes[succ][k]++;
                 f->preds[succ][k][f->predsSizes[succ][k]] = j;
+                f->predsSizes[succ][k]++;
             }
 	}   
 	
